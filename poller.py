@@ -42,7 +42,9 @@ def _extract(update: dict):
 
 def run_once() -> int:
     allowed = os.environ.get("STOCK_ALLOWED_CHAT", "").strip()
-    resp = telegram.get_updates()
+    # Short long-poll: wait up to ~20s for a message so a run triggered right
+    # after a post still catches it (Telegram holds the connection open).
+    resp = telegram.get_updates(timeout=20)
     if not resp.get("ok"):
         print("getUpdates failed:", resp.get("error") or resp)
         return 0

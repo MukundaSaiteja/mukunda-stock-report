@@ -53,10 +53,15 @@ def run_once() -> int:
         print("No new updates.")
         return 0
 
+    # CLAIM the updates FIRST: confirm the offset before the slow analysis so any
+    # other poll (GitHub cron + cron-job.org both firing) that starts meanwhile
+    # sees an empty queue and skips. Whoever grabs it first owns it; the rest
+    # ignore -> exactly one PDF per command, no duplicates.
+    last_id = updates[-1].get("update_id")
+    telegram.get_updates(offset=last_id + 1)
+
     processed = 0
-    last_id = None
     for up in updates:
-        last_id = up.get("update_id")
         parsed = _extract(up)
         if not parsed:
             continue
@@ -82,9 +87,6 @@ def run_once() -> int:
         print("sent PDF:", "ok" if r.get("ok") else r)
         processed += 1
 
-    # Confirm offset so these updates are not returned again.
-    if last_id is not None:
-        telegram.get_updates(offset=last_id + 1)
     print(f"Processed {processed} command(s).")
     return processed
 

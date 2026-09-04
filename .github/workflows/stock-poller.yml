@@ -4,7 +4,7 @@ name: Stock Poller
 # research PDF. Public repo -> unlimited Actions minutes, so 5-min polling is free.
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "* * * * *"   # every minute (public repo = free unlimited minutes)
   workflow_dispatch:
     inputs:
       symbol:

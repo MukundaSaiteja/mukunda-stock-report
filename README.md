@@ -38,6 +38,24 @@ It reuses the same Telegram bot (`@Analysis_Stock_Alert_bot`); the bot only ever
 7. Analyst view — target/recommendation where available
 8. Layers needing deep review (news arc, concall tone, variant view) → marked `n/a`
 
+## Price-level alerts (support / resistance)
+
+Set an alert on any stock and get pinged when price crosses it. The per-minute
+poller checks live prices (NSE quote, yfinance fallback).
+
+```
+/alert RELIANCE below 1250          # ping when price falls to/below 1250
+/alert RELIANCE above 1400          # ping when price rises to/above 1400
+/alert RELIANCE                     # auto: uses computed S1 (below) & R1 (above)
+/alerts                             # list active alerts
+/cancelalert RELIANCE               # remove all alerts for a symbol
+/cancelalert RELIANCE below 1250    # remove one specific alert
+```
+
+One-shot + cooldown: fires once on crossing, stays quiet for `ALERT_COOLDOWN_HOURS`
+(default 6), and re-arms when price returns to the safe side. State lives in
+`data/alerts.json`, committed back each run so it persists across the stateless polls.
+
 ## Setup
 
 1. This repo is **public** (so Actions polling is free). No secrets live in code.

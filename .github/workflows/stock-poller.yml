@@ -16,6 +16,9 @@ concurrency:
   group: stock-poller
   cancel-in-progress: false
 
+permissions:
+  contents: write   # allow committing the alerts state back
+
 jobs:
   poll:
     runs-on: ubuntu-latest
@@ -34,9 +37,24 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.STOCK_CHAT_ID }}
         run: python main.py --symbol "${{ github.event.inputs.symbol }}" --send
 
-      - name: Poll for /stock commands
+      - name: Poll for /stock commands + check price alerts
         if: ${{ github.event.inputs.symbol == '' }}
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           STOCK_ALLOWED_CHAT: ${{ secrets.STOCK_CHAT_ID }}
+          ALERTS_FILE: data/alerts.json
         run: python poller.py
+
+      - name: Persist alerts state (if changed)
+        if: ${{ github.event.inputs.symbol == '' }}
+        run: |
+          if ! git diff --quiet -- data/alerts.json; then
+            git config user.name  "stock-bot"
+            git config user.email "stock-bot@users.noreply.github.com"
+            git add data/alerts.json
+            git commit -m "chore: update price-alert state [skip ci]"
+            git pull --rebase --autostash origin main || true
+            git push
+          else
+            echo "No alert-state change."
+          fi

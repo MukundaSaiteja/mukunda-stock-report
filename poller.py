@@ -17,27 +17,26 @@ import os
 import re
 import tempfile
 
+from analysis import alerts as alertsmod
 from analysis.analyzer import analyze
 from notifications import telegram
 
-_CMD = re.compile(r"^/stock(?:@\w+)?\s+([A-Za-z0-9&\-\.]{1,20})", re.IGNORECASE)
+_STOCK = re.compile(r"^/stock(?:@\w+)?\s+([A-Za-z0-9&\-\.]{1,20})", re.IGNORECASE)
 
 
-def _extract(update: dict):
-    """Return (chat_id, symbol, from_bot) for a /stock command, else None."""
+def _message(update: dict):
+    """Return (chat_id, text) for a user message/channel post, else None."""
     msg = update.get("message") or update.get("channel_post")
     if not msg:
         return None
     text = (msg.get("text") or "").strip()
-    m = _CMD.match(text)
-    if not m:
+    if not text:
+        return None
+    frm = msg.get("from") or {}
+    if frm.get("is_bot"):          # ignore the bot's own posts (no loops)
         return None
     chat = msg.get("chat") or {}
-    chat_id = chat.get("id")
-    frm = msg.get("from") or {}
-    sender_chat = msg.get("sender_chat") or {}
-    from_bot = bool(frm.get("is_bot")) or sender_chat.get("type") == "channel" and False
-    return str(chat_id), m.group(1).upper(), from_bot
+    return str(chat.get("id")), text
 
 
 def run_once() -> int:
@@ -47,10 +46,12 @@ def run_once() -> int:
     resp = telegram.get_updates(timeout=20)
     if not resp.get("ok"):
         print("getUpdates failed:", resp.get("error") or resp)
+        _check_price_alerts()
         return 0
     updates = resp.get("result", [])
     if not updates:
         print("No new updates.")
+        _check_price_alerts()
         return 0
 
     # CLAIM the updates FIRST: confirm the offset before the slow analysis so any
@@ -62,14 +63,28 @@ def run_once() -> int:
 
     processed = 0
     for up in updates:
-        parsed = _extract(up)
+        parsed = _message(up)
         if not parsed:
             continue
-        chat_id, symbol, _from_bot = parsed
+        chat_id, text = parsed
         if allowed and chat_id != allowed:
-            print(f"Ignoring command from non-allowed chat {chat_id}")
+            print(f"Ignoring message from non-allowed chat {chat_id}")
             continue
 
+        # Route: /alert* commands first (set/list/cancel price-level alerts).
+        if text.lower().startswith(("/alert", "/alerts", "/cancelalert")):
+            reply = alertsmod.handle_command(text, chat_id)
+            if reply:
+                print(f"Alert command: {text!r}")
+                telegram.send_message(chat_id, reply)
+                processed += 1
+            continue
+
+        # /stock <SYMBOL> -> research PDF.
+        m = _STOCK.match(text)
+        if not m:
+            continue
+        symbol = m.group(1).upper()
         print(f"Command: /stock {symbol} from chat {chat_id}")
         telegram.send_message(chat_id, f"📄 Analyzing *{symbol}* — PDF shortly...")
         out = os.path.join(tempfile.gettempdir(), f"{symbol}_report.pdf")
@@ -88,7 +103,21 @@ def run_once() -> int:
         processed += 1
 
     print(f"Processed {processed} command(s).")
+    _check_price_alerts()
     return processed
+
+
+def _check_price_alerts() -> None:
+    """Check active price-level alerts against live prices and notify on crossings."""
+    try:
+        fires = alertsmod.check_alerts()
+    except Exception as exc:  # noqa: BLE001
+        print("alert check failed:", exc)
+        return
+    for chat_id, message in fires:
+        telegram.send_message(chat_id, message)
+        print(f"alert fired -> {chat_id}")
+    print(f"Price alerts fired: {len(fires)}.")
 
 
 if __name__ == "__main__":

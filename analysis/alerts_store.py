@@ -21,8 +21,10 @@ import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 ALERTS_FILE = Path(os.environ.get("ALERTS_FILE", "data/alerts.json"))
+IST = ZoneInfo("Asia/Kolkata")
 COOLDOWN_HOURS = float(os.environ.get("ALERT_COOLDOWN_HOURS", "6"))
 
 
@@ -85,30 +87,33 @@ def _crossed(alert: Alert, price: float) -> bool:
     return price <= alert.level
 
 
-def _cooldown_elapsed(alert: Alert) -> bool:
-    if not alert.last_fired:
-        return True
+def _ist_date(iso: str | None) -> str | None:
+    if not iso:
+        return None
     try:
-        last = datetime.fromisoformat(alert.last_fired)
+        return datetime.fromisoformat(iso).astimezone(IST).strftime("%Y-%m-%d")
     except ValueError:
-        return True
-    return (_now() - last).total_seconds() >= COOLDOWN_HOURS * 3600
+        return None
 
 
 def evaluate(alert: Alert, price: float) -> bool:
-    """Return True if this alert should FIRE now (crossed + armed/cooldown ok).
+    """Return True if this alert should FIRE now.
 
-    Mutates armed/last_fired on fire so it goes quiet for the cooldown, then
-    re-arms automatically once the cooldown passes.
+    Policy: fire at most ONCE PER IST DAY while the price is past the level. So a
+    fresh crossing pings today; if it's still past the level tomorrow you get one
+    more ping (a daily reminder), never a per-minute repeat. It also re-arms
+    immediately if price returns to the safe side.
     """
+    today = datetime.now(timezone.utc).astimezone(IST).strftime("%Y-%m-%d")
+
     if not _crossed(alert, price):
-        # Re-arm when price moves back to the safe side (so it can fire again later).
-        if not alert.armed and _cooldown_elapsed(alert):
-            alert.armed = True
+        # Safe side -> ready for the next crossing.
+        alert.armed = True
         return False
-    if not alert.armed:
+
+    # Past the level. Fire if we haven't already fired today.
+    if _ist_date(alert.last_fired) == today:
         return False
-    # Fire once, then disarm + stamp time (cooldown).
     alert.armed = False
-    alert.last_fired = _now().isoformat()
+    alert.last_fired = datetime.now(timezone.utc).isoformat()
     return True

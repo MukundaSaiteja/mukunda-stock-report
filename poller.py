@@ -71,13 +71,13 @@ def run_once() -> int:
             print(f"Ignoring message from non-allowed chat {chat_id}")
             continue
 
-        # Route: /alert* commands first (set/list/cancel price-level alerts).
-        if text.lower().startswith(("/alert", "/alerts", "/cancelalert")):
-            reply = alertsmod.handle_command(text, chat_id)
-            if reply:
-                print(f"Alert command: {text!r}")
-                telegram.send_message(chat_id, reply)
-                processed += 1
+        # Let the alerts handler take any alert command (/alert, @alert, /alerts,
+        # /cancelalert, or "/stock SYM alert delete"). If it replies, we're done.
+        reply = alertsmod.handle_command(text, chat_id)
+        if reply is not None:
+            print(f"Alert command: {text!r}")
+            telegram.send_message(chat_id, reply)
+            processed += 1
             continue
 
         # /stock <SYMBOL> -> research PDF.

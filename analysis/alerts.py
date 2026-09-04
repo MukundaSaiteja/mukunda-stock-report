@@ -20,14 +20,39 @@ from analysis import alerts_store as store
 from analysis.alerts_store import Alert, make_id
 from analysis.price import live_price
 
+# Bare "/alert" or "@alert" (with nothing after) -> show help.
+_HELP = re.compile(r"^[/@]alert(?:@\w+)?\s*$", re.IGNORECASE)
+# Set: /alert SYM [above|below PRICE]   (also accepts @alert)
 _ALERT = re.compile(
-    r"^/alert(?:@\w+)?\s+([A-Za-z0-9&\-\.]{1,20})(?:\s+(above|below)\s+([0-9]+(?:\.[0-9]+)?))?\s*$",
+    r"^[/@]alert(?:@\w+)?\s+([A-Za-z0-9&\-\.]{1,20})(?:\s+(above|below)\s+([0-9]+(?:\.[0-9]+)?))?\s*$",
     re.IGNORECASE,
 )
-_ALERTS = re.compile(r"^/alerts(?:@\w+)?\s*$", re.IGNORECASE)
+_ALERTS = re.compile(r"^[/@]alerts(?:@\w+)?\s*$", re.IGNORECASE)
+# Delete, several natural forms:
+#   /cancelalert SYM [above|below PRICE]
+#   /alert delete SYM   |   /alert SYM delete
+#   /stock SYM alert delete   |   /stock SYM delete alert
 _CANCEL = re.compile(
-    r"^/cancelalert(?:@\w+)?\s+([A-Za-z0-9&\-\.]{1,20})(?:\s+(above|below)\s+([0-9]+(?:\.[0-9]+)?))?\s*$",
+    r"^[/@]cancelalert(?:@\w+)?\s+([A-Za-z0-9&\-\.]{1,20})(?:\s+(above|below)\s+([0-9]+(?:\.[0-9]+)?))?\s*$",
     re.IGNORECASE,
+)
+_DELETE = re.compile(
+    r"^(?:[/@]alert(?:@\w+)?\s+delete\s+([A-Za-z0-9&\-\.]{1,20})"
+    r"|[/@]alert(?:@\w+)?\s+([A-Za-z0-9&\-\.]{1,20})\s+delete"
+    r"|[/@]stock(?:@\w+)?\s+([A-Za-z0-9&\-\.]{1,20})\s+(?:alert\s+delete|delete\s+alert))\s*$",
+    re.IGNORECASE,
+)
+
+HELP_TEXT = (
+    "🔔 *Price alerts — how to use*\n"
+    "`/alert RELIANCE below 1250`  — ping when price falls to/below 1250\n"
+    "`/alert RELIANCE above 1400`  — ping when price rises to/above 1400\n"
+    "`/alert RELIANCE`  — auto: use computed S1 (below) & R1 (above)\n"
+    "`/alerts`  — list your active alerts\n"
+    "`/stock RELIANCE alert delete`  — remove alerts for a stock\n"
+    "`/cancelalert RELIANCE below 1250`  — remove one specific alert\n\n"
+    "_Fires once when the level is crossed; won't repeat while price stays there — "
+    "it re-arms only after price returns to the safe side._"
 )
 
 
@@ -49,6 +74,18 @@ def handle_command(text: str, chat_id: str) -> str | None:
     """Handle an /alert* command. Returns a reply string, or None if not a command."""
     alerts = store.load()
 
+    # Bare "/alert" or "@alert" -> show usage help automatically.
+    if _HELP.match(text):
+        return HELP_TEXT
+
+    # Delete forms: /alert delete SYM | /alert SYM delete | /stock SYM alert delete
+    m = _DELETE.match(text)
+    if m:
+        sym = (m.group(1) or m.group(2) or m.group(3)).upper()
+        alerts, n = store.remove_symbol(alerts, sym)
+        store.save(alerts)
+        return f"🗑️ Removed {n} alert(s) for {sym}." if n else f"No alerts found for {sym}."
+
     m = _ALERTS.match(text)
     if m:
         mine = [a for a in alerts if a.chat_id == chat_id]
@@ -56,7 +93,7 @@ def handle_command(text: str, chat_id: str) -> str | None:
             return "No active alerts. Set one with `/alert RELIANCE below 1250`."
         lines = ["🔔 *Active alerts:*"]
         for a in mine:
-            state = "armed" if a.armed else "cooling down"
+            state = "armed" if a.armed else "fired today"
             lines.append(f"• {a.symbol} {a.direction} {a.level:g}  ({a.note or 'manual'}, {state})")
         return "\n".join(lines)
 

@@ -44,6 +44,21 @@ def _cr(x):
         return "n/a"
 
 
+def _empty_reason(g: str, mom: dict) -> str:
+    """Why an A-F group has no signal, so a blank never looks like a bug."""
+    if g in ("D", "E", "F") and not mom.get("nse_used"):
+        return "NSE live feed unavailable this run"
+    return {
+        "A": "no strong results signal (profit / turnaround)",
+        "B": "no accumulation footprint (circuit / volume / breakout / RS)",
+        "C": "no forward-PE re-rating",
+        "D": "no high-impact filing matched today",
+        "E": ("not in F&O - no open interest" if not mom.get("in_fno")
+              else "no OI buildup / spurt"),
+        "F": "no SAST >5% stake or bulk/block BUY disclosed",
+    }.get(g, "")
+
+
 class PDF(FPDF):
     title = "Stock Research"
 
@@ -247,22 +262,28 @@ def build(result: dict, out_path: str) -> str:
         para("A-F coverage:   " + "    ".join(f"{g} {'yes' if cov.get(g) else '-'}" for g in "ABCDEF"), 8, "B")
         gn = mom.get("group_names", {})
         groups = mom.get("groups", {})
-        if any(groups.get(g) for g in "ABCDEF"):
-            for g in "ABCDEF":
-                lines = groups.get(g) or []
-                if not lines:
-                    continue
-                pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 8.2)
-                pdf.multi_cell(EPW, 4.6, _san(f"{g}. {gn.get(g, '')}"))
+        # Always show all six groups; an empty one prints its reason (never omitted,
+        # so a blank never looks like a bug).
+        for g in "ABCDEF":
+            lines = groups.get(g) or []
+            pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 8.2)
+            pdf.multi_cell(EPW, 4.6, _san(f"{g}. {gn.get(g, '')}"))
+            if lines:
                 for ln in lines:
                     pdf.set_x(pdf.l_margin + 4); pdf.set_font("Helvetica", "", 8.2)
                     pdf.multi_cell(EPW - 4, 4.2, _san(f"- {ln}"))
-        else:
-            para("No footprints cleared the thresholds for this stock right now.", 8, "I")
+            else:
+                pdf.set_x(pdf.l_margin + 4); pdf.set_font("Helvetica", "I", 7.6)
+                pdf.set_text_color(*GREY)
+                pdf.multi_cell(EPW - 4, 4.2, _san(f"- none - {_empty_reason(g, mom)}"))
+                pdf.set_text_color(0, 0, 0)
         if mom.get("verify"):
             pdf.ln(0.5); para("Verify next: " + "  ".join(mom["verify"]), 7.4, "I")
         if not mom.get("nse_used"):
-            para("(NSE live feeds unavailable this run - circuit/bulk/OI/SAST/news may be understated.)", 6.8, "I")
+            para("Note: NSE live feeds (D news / E open-interest / F stake+bulk) were unreachable "
+                 "this run - those groups reflect no data, not necessarily no event.", 7, "I")
+        para("Legend: A results  B accumulation  C valuation  D news  E derivatives/OI  F stake/bulk. "
+             "E exists only for F&O stocks; F needs a filed disclosure.", 6.8, "I")
         para("Footprints, not advice - a move can be genuine news, an index event, or a pump.", 6.8, "I")
 
     pdf.output(out_path)

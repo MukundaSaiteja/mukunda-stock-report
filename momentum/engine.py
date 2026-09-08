@@ -150,6 +150,7 @@ def compute(symbol: str, price_df, info: dict | None = None, nifty_df=None) -> d
             "delivery": ctx.get("deliv_pct"),
             "nse_used": bool(market) and any(market.get(k) for k in
                                              ("circuits", "highs", "bulk", "results", "news", "oi", "stakes")),
+            "in_fno": symbol in (market.get("oi") or {}),
             "verify": _verify_note(c),
         }
     except Exception as exc:  # noqa: BLE001

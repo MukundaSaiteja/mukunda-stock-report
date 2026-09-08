@@ -71,6 +71,7 @@ def build(result: dict, out_path: str) -> str:
     val_analyst = result["analyst"]
     verdict = result["verdict"]
     fin = result["financials_table"]
+    mom = result.get("momentum")
     sym = result["symbol"]
     name = snap.get("name") or sym
 
@@ -229,6 +230,40 @@ def build(result: dict, out_path: str) -> str:
     para("Deep dated-news timeline & sentiment arc, management concall tone/credibility, "
          "governance/promoter-pledge deep-dive, and the variant-view verdict require an "
          "analyst/LLM pass and are NOT in this automated quant snapshot.", 8)
+
+    # ---- 9. Momentum footprints (A-F) ----
+    sec("9. Momentum footprints (A-F)  -  why it may be moving")
+    if not mom or not mom.get("ok"):
+        para("Momentum footprints unavailable for this stock (n/a).", 8, "I")
+    else:
+        seg = f"  |  {mom['segment']}" if mom.get("segment") else ""
+        para(f"Signal: {mom.get('tier','')} - {mom.get('scenario','')}   |   "
+             f"score {mom.get('score',0)}   |   {mom.get('n_signals',0)} signals{seg}", 9.5, "B")
+        pos = mom.get("pos_52w")
+        para(f"CMP Rs {_num(mom.get('price'), 1)}  ({_num(mom.get('day_pct'), 1, '%')} today)   |   "
+             f"52W Rs {_num(mom.get('w52_low'), 0)} - {_num(mom.get('w52_high'), 0)}"
+             + (f"   (position {pos:.0f}%)" if pos is not None else ""), 8)
+        cov = mom.get("coverage", {})
+        para("A-F coverage:   " + "    ".join(f"{g} {'yes' if cov.get(g) else '-'}" for g in "ABCDEF"), 8, "B")
+        gn = mom.get("group_names", {})
+        groups = mom.get("groups", {})
+        if any(groups.get(g) for g in "ABCDEF"):
+            for g in "ABCDEF":
+                lines = groups.get(g) or []
+                if not lines:
+                    continue
+                pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 8.2)
+                pdf.multi_cell(EPW, 4.6, _san(f"{g}. {gn.get(g, '')}"))
+                for ln in lines:
+                    pdf.set_x(pdf.l_margin + 4); pdf.set_font("Helvetica", "", 8.2)
+                    pdf.multi_cell(EPW - 4, 4.2, _san(f"- {ln}"))
+        else:
+            para("No footprints cleared the thresholds for this stock right now.", 8, "I")
+        if mom.get("verify"):
+            pdf.ln(0.5); para("Verify next: " + "  ".join(mom["verify"]), 7.4, "I")
+        if not mom.get("nse_used"):
+            para("(NSE live feeds unavailable this run - circuit/bulk/OI/SAST/news may be understated.)", 6.8, "I")
+        para("Footprints, not advice - a move can be genuine news, an index event, or a pump.", 6.8, "I")
 
     pdf.output(out_path)
     return out_path

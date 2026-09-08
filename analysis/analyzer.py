@@ -6,6 +6,7 @@ import pandas as pd
 
 from analysis import data as datamod
 from analysis import forensic, quant, technicals, valuation, verdict
+from momentum import engine as momentum_engine
 from report import pdf as pdfmod
 
 
@@ -54,6 +55,10 @@ def analyze(symbol: str, out_pdf: str) -> dict:
     vd = verdict.build(snap, tech, fore, qt)
     fin_tbl = _financials_table(d.financials, d.cashflow)
 
+    # A-F momentum footprints (why the stock may be moving). Best-effort: on any
+    # failure it returns {"ok": False} and the PDF renders the section as n/a.
+    mom = momentum_engine.compute(d.symbol, d.price, d.info, d.nifty)
+
     result = {
         "ok": True,
         "symbol": d.symbol,
@@ -66,6 +71,7 @@ def analyze(symbol: str, out_pdf: str) -> dict:
         "quant": qt,
         "verdict": vd,
         "financials_table": fin_tbl,
+        "momentum": mom,
     }
     result["pdf"] = pdfmod.build(result, out_pdf)
     return result

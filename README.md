@@ -37,6 +37,13 @@ It reuses the same Telegram bot (`@Analysis_Stock_Alert_bot`); the bot only ever
 6. **Support/Resistance** — pivots S1/S2/S3 · R1/R2/R3 + swings + 52W
 7. Analyst view — target/recommendation where available
 8. Layers needing deep review (news arc, concall tone, variant view) → marked `n/a`
+9. **Momentum footprints (A–F)** — *why it may be moving*: reverse-engineers the
+   move into the A–F root-cause groups (A results, B accumulation, C valuation,
+   D news, E derivatives/OI, F stake/bulk flows), scores + tiers it, and prints a
+   ranked card (upper-circuit streak, volume/turnover spikes, breakout, 52W high,
+   RS vs Nifty, profit YoY, fwd-PE re-rating, OI buildup, SAST/bulk, T2T tag).
+   Reuses the `unusual-activity` engine; drives it off the report's yfinance data
+   plus best-effort NSE feeds (degrades to yfinance-only if NSE is blocked).
 
 ## Price-level alerts (support / resistance)
 

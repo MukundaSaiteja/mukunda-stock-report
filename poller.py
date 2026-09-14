@@ -18,10 +18,28 @@ import re
 import tempfile
 
 from analysis import alerts as alertsmod
-from analysis.analyzer import analyze
+from analysis import scorecard as scorecardmod
+from analysis.analyzer import analyze, scorecard_only
 from notifications import telegram
 
 _STOCK = re.compile(r"^/stock(?:@\w+)?\s+([A-Za-z0-9&\-\.]{1,20})", re.IGNORECASE)
+
+# Scorecard-only (text) command. Accepts several natural forms:
+#   /scorecard CUPID        /valuation CUPID        /valuation-scorecard CUPID
+#   /stock valuation-scorecard CUPID                /stock CUPID scorecard
+_SCORECARD_PATTERNS = (
+    re.compile(r"^/(?:scorecard|valuation(?:-scorecard)?)(?:@\w+)?\s+([A-Za-z0-9&\-\.]{1,20})\s*$", re.IGNORECASE),
+    re.compile(r"^/stock(?:@\w+)?\s+valuation-scorecard\s+([A-Za-z0-9&\-\.]{1,20})\s*$", re.IGNORECASE),
+    re.compile(r"^/stock(?:@\w+)?\s+([A-Za-z0-9&\-\.]{1,20})\s+(?:valuation-?)?scorecard\s*$", re.IGNORECASE),
+)
+
+
+def _parse_scorecard(text: str):
+    for pat in _SCORECARD_PATTERNS:
+        m = pat.match(text)
+        if m:
+            return m.group(1).upper()
+    return None
 
 
 def _message(update: dict):
@@ -77,6 +95,27 @@ def run_once() -> int:
         if reply is not None:
             print(f"Alert command: {text!r}")
             telegram.send_message(chat_id, reply)
+            processed += 1
+            continue
+
+        # /scorecard SYM (and variants) -> the valuation scorecard as a TEXT message
+        # (no PDF). Checked BEFORE /stock so "/stock valuation-scorecard X" isn't
+        # mis-read as symbol "valuation-scorecard".
+        sc_sym = _parse_scorecard(text)
+        if sc_sym:
+            print(f"Command: scorecard {sc_sym} from chat {chat_id}")
+            telegram.send_message(chat_id, f"📊 Scoring *{sc_sym}* ...")
+            try:
+                res = scorecard_only(sc_sym)
+            except Exception as exc:  # noqa: BLE001
+                telegram.send_message(chat_id, f"❌ Error scoring *{sc_sym}*: {exc}")
+                continue
+            if not res.get("ok"):
+                telegram.send_message(chat_id, f"❌ Could not score *{sc_sym}*: {res.get('error')}\nUse the exact NSE symbol (e.g. RELIANCE).")
+                continue
+            msg = scorecardmod.to_telegram(res["scorecard"], res["name"], sc_sym)
+            r = telegram.send_message(chat_id, msg, parse_mode="HTML")
+            print("sent scorecard:", "ok" if r.get("ok") else r)
             processed += 1
             continue
 

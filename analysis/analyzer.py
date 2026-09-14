@@ -83,3 +83,20 @@ def analyze(symbol: str, out_pdf: str) -> dict:
     }
     result["pdf"] = pdfmod.build(result, out_pdf)
     return result
+
+
+def scorecard_only(symbol: str) -> dict:
+    """Just the sector-aware multi-factor scorecard for one symbol (no PDF). Best-effort."""
+    d = datamod.fetch(symbol)
+    if not d.ok:
+        return {"ok": False, "symbol": d.symbol, "error": d.error}
+    snap = valuation.snapshot(d.info)
+    tech = technicals.compute(d.price)
+    fore = forensic.compute(d.financials, d.balance_sheet, d.cashflow)
+    qt = quant.compute(d.price, d.nifty)
+    try:
+        sc = scorecard.compute({**d.info, "symbol": d.symbol}, {**snap, "symbol": d.symbol},
+                               fore, qt, tech, d.financials, d.balance_sheet)
+    except Exception as exc:  # noqa: BLE001
+        sc = {"error": str(exc)}
+    return {"ok": True, "symbol": d.symbol, "name": snap.get("name") or d.symbol, "scorecard": sc}

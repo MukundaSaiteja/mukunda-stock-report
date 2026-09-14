@@ -5,6 +5,12 @@ in the Telegram channel and a poller builds a quant research **PDF** and posts i
 back — snapshot, 5Y financials, forensic scores, quant factors, full technicals
 and **support/resistance**, plus a rule-based verdict.
 
+Want just the valuation read (no PDF)? Post **`/scorecard <SYMBOL>`** and it replies
+in-chat with the **sector-aware multi-factor scorecard** as text — composite /100 +
+grade + verdict, the Value/Quality/Growth/Safety/Momentum/Payout breakdown, archetype
+and outlier flags. Accepted forms: `/scorecard CUPID`, `/valuation CUPID`,
+`/stock valuation-scorecard CUPID`, `/stock CUPID scorecard`.
+
 > Educational quant snapshot, **not** SEBI-registered advice. Verify live.
 
 ## How it works

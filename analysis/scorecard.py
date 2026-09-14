@@ -420,3 +420,70 @@ def _archetype(pe, pb, g, roce, cfo, dy, peg, sec_key, loss, fset):
     if g is not None and g < 0 and not loss:
         return "Turnaround / de-rating", "earnings falling - needs a catalyst; cheap-for-a-reason risk"
     return "Core / blend", "no single dominant pattern - judge on the full scorecard"
+
+
+_SYM = {"+": "\u2713", "~": "~", "x": "\u2717", "?": "?"}
+
+
+def _short(lbl):
+    return re.sub(r"\s*\(.*?\)", "", lbl or "")
+
+
+def to_telegram(sc: dict, name: str, symbol: str) -> str:
+    """Render the scorecard dict as a Telegram HTML message (monospace <pre> block so
+    the columns line up, matching the on-screen scorecard)."""
+    from html import escape
+    if not sc or sc.get("error") or sc.get("composite") is None:
+        why = (sc or {}).get("error") or "insufficient data (SME/just-listed names are often not on Yahoo)"
+        return (f"\U0001f4ca <b>{escape(name)} ({escape(symbol)})</b>\n"
+                f"Valuation scorecard unavailable - {escape(str(why))}.\nTry the exact NSE symbol.")
+
+    comp = sc["composite"]
+    L = [f"{name} ({symbol})  -  Valuation Scorecard",
+         f"Sector: {sc.get('sector')}  |  Lens: {sc.get('lens')}",
+         "",
+         f"COMPOSITE {comp}/100   Grade {sc.get('grade')}   -> {sc.get('verdict')}"]
+    if sc.get("gate"):
+        L.append(f"          {sc['gate'].strip()}")
+    if sc.get("what_i_think"):
+        L.append(f"Read: {sc['what_i_think']}")
+    L.append(f"Archetype: {sc.get('archetype')}")
+    L.append(f"Confidence: {sc.get('confidence')} ({sc.get('families_scored')}/6 families)")
+
+    fams = {f["name"]: f for f in sc.get("families", [])}
+
+    def hd(f):
+        pts = f"{f['points']:.1f}/{f['weight']}" if f["points"] is not None else f"n/a/{f['weight']}"
+        scp = f"{f['score']*100:.0f}%" if f["score"] is not None else "skipped"
+        return f"{f['name'].upper():<8}{pts:>8}  ({scp})"
+
+    for nm in ("Value", "Quality"):
+        f = fams.get(nm)
+        if not f:
+            continue
+        L.append("")
+        L.append(hd(f))
+        for r in f["rows"]:
+            L.append(f"  {_SYM.get(r.get('sym'), '?')} {_short(r['label']):<18}{r['value']:>8}  {r.get('note', '')}")
+    for nm in ("Growth", "Safety", "Momentum", "Payout"):
+        f = fams.get(nm)
+        if not f:
+            continue
+        if f["score"] is None:
+            note = (f["rows"][0].get("note") if f["rows"] else "") or ""
+            L.append(hd(f) + (f"  {note}" if note and note != "skipped" else ""))
+        else:
+            bits = " \u00b7 ".join(f"{_SYM.get(r.get('sym'), '?')} {_short(r['label'])} {r['value']}" for r in f["rows"])
+            L.append(hd(f))
+            L.append(f"   {bits}")
+
+    if sc.get("bank_kpis"):
+        kp = "  ".join(f"{k} {v}%" for k, v in sc["bank_kpis"].items() if v is not None)
+        L += ["", f"Bank KPIs: {kp}"]
+    if sc.get("flags"):
+        L.append("")
+        for n, w in sc["flags"]:
+            L.append(f"! {n}: {w}")
+
+    body = escape("\n".join(L))
+    return f"<pre>{body}</pre>\n<i>Educational, not advice. Verify on Screener/filings.</i>"

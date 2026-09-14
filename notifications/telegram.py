@@ -13,14 +13,14 @@ def _token() -> str:
     return os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 
 
-def send_message(chat_id: str, text: str) -> dict:
+def send_message(chat_id: str, text: str, parse_mode: str = "Markdown") -> dict:
     token = _token()
     if not token:
         return {"ok": False, "error": "no TELEGRAM_BOT_TOKEN"}
     try:
         r = requests.post(
             _API.format(token=token, method="sendMessage"),
-            data={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+            data={"chat_id": chat_id, "text": text, "parse_mode": parse_mode},
             timeout=30,
         )
         return r.json()

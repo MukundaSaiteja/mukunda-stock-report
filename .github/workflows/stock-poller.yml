@@ -11,6 +11,11 @@ on:
         description: "Analyse this NSE symbol now (skip polling)"
         required: false
         type: string
+      scorecard:
+        description: "Reply with the text scorecard instead of the PDF?"
+        required: false
+        type: boolean
+        default: true
 
 concurrency:
   group: stock-poller
@@ -35,7 +40,12 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.STOCK_CHAT_ID }}
-        run: python main.py --symbol "${{ github.event.inputs.symbol }}" --send
+        run: |
+          if [ "${{ github.event.inputs.scorecard }}" = "false" ]; then
+            python main.py --symbol "${{ github.event.inputs.symbol }}" --send
+          else
+            python main.py --symbol "${{ github.event.inputs.symbol }}" --scorecard --send
+          fi
 
       - name: Poll for /stock commands + check price alerts
         if: ${{ github.event.inputs.symbol == '' }}

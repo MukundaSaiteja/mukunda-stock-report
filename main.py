@@ -12,19 +12,40 @@ import argparse
 import os
 import tempfile
 
-from analysis.analyzer import analyze
+from analysis.analyzer import analyze, scorecard_only
+from analysis import scorecard as scorecardmod
 from notifications import telegram
 
 
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(prog="main.py")
     p.add_argument("--symbol", required=True, help="Exact NSE symbol, e.g. RELIANCE")
-    p.add_argument("--send", action="store_true", help="Send the PDF to Telegram")
+    p.add_argument("--send", action="store_true", help="Send to Telegram")
+    p.add_argument("--scorecard", action="store_true",
+                   help="Reply with the text valuation scorecard instead of the PDF")
     p.add_argument("--chat", default=os.environ.get("TELEGRAM_CHAT_ID", ""), help="Telegram chat/channel id")
     p.add_argument("--out", default="", help="PDF output path (default: temp)")
     args = p.parse_args(argv)
 
     sym = args.symbol.strip().upper()
+
+    # --- text scorecard mode (no PDF) ---
+    if args.scorecard:
+        print(f"Scoring {sym} ...")
+        res = scorecard_only(sym)
+        if not res.get("ok"):
+            print(f"FAILED: {res.get('error')}")
+            if args.send and args.chat:
+                telegram.send_message(args.chat, f"❌ Could not score *{sym}*: {res.get('error')}\nUse the exact NSE symbol (e.g. RELIANCE).")
+            return
+        msg = scorecardmod.to_telegram(res["scorecard"], res["name"], sym)
+        if args.send and args.chat:
+            resp = telegram.send_message(args.chat, msg, parse_mode="HTML")
+            print("Telegram:", "SENT" if resp.get("ok") else resp)
+        else:
+            print(msg)
+        return
+
     out = args.out or os.path.join(tempfile.gettempdir(), f"{sym}_report.pdf")
 
     print(f"Analyzing {sym} ...")

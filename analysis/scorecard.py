@@ -195,7 +195,7 @@ def _cagr(vals, years=3):
 
 def _M(label, val, score, fmt, good, ok, weak):
     if val is None or score is None:
-        return {"sym": "?", "label": label, "value": "n/a", "note": "n/a - verify on Screener/filing"}
+        return {"sym": "?", "label": label, "value": "n/a", "note": ""}
     sym = "+" if score >= 0.66 else "~" if score >= 0.33 else "x"
     note = good if score >= 0.66 else ok if score >= 0.33 else weak
     return {"sym": sym, "label": label, "value": fmt(val), "note": note, "_s": score}

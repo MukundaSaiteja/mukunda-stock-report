@@ -292,39 +292,62 @@ def build(result: dict, out_path: str) -> str:
     if not sc or sc.get("error") or sc.get("composite") is None:
         para("Valuation scorecard unavailable for this stock (n/a).", 8, "I")
     else:
+        import re as _re
         AMBER = (200, 140, 0)
+        MK = {"+": GREEN, "~": AMBER, "x": RED, "?": GREY}
         comp = sc["composite"]
         vcol = GREEN if comp >= 68 else (AMBER if comp >= 54 else RED)
-        # Composite headline
         pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 11); pdf.set_text_color(*vcol)
         pdf.multi_cell(EPW, 5.6, _san(f"COMPOSITE: {comp}/100   Grade {sc['grade']}   ->  {sc['verdict']}{sc.get('gate','')}"))
         pdf.set_text_color(0, 0, 0)
-        para(f"Sector: {sc.get('sector')}  |  Lens: {sc.get('lens')}  |  Confidence: {sc.get('confidence')} "
+        para(f"Sector: {sc.get('sector')}   |   Lens: {sc.get('lens')}   |   Confidence: {sc.get('confidence')} "
              f"({sc.get('families_scored')}/6 families)", 8, "B")
         if sc.get("what_i_think"):
-            para(f"What I think: {sc['what_i_think']}  -  {sc.get('archetype')}", 8)
-        if sc.get("archetype_note"):
-            para(f"Archetype: {sc.get('archetype')} - {sc['archetype_note']}", 7.6, "I")
+            para(f"Read: {sc['what_i_think']}", 8)
+        if sc.get("archetype"):
+            para(f"Archetype - {sc.get('archetype')}: {sc.get('archetype_note','')}", 7.6, "I")
 
-        def _fam(fm):
+        def _head(fm):
             pts = f"{fm['points']:.1f}/{fm['weight']}" if fm["points"] is not None else f"n/a/{fm['weight']}"
             scp = f"{fm['score']*100:.0f}%" if fm["score"] is not None else "skipped"
-            pdf.ln(0.6); pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 8.6); pdf.set_text_color(*NAVY)
-            pdf.cell(0, 4.8, _san(f"{fm['name'].upper()}   {pts}   ({scp})"), ln=1)
-            pdf.set_text_color(0, 0, 0)
-            for r in fm["rows"]:
-                mk = {"+": GREEN, "~": AMBER, "x": RED, "?": GREY}.get(r.get("sym"), GREY)
-                pdf.set_x(pdf.l_margin + 2); pdf.set_font("Helvetica", "B", 8); pdf.set_text_color(*mk)
-                pdf.cell(4.5, 4.4, _san(f"[{r.get('sym','?')}]"))
-                pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 8)
-                pdf.cell(44, 4.4, _san(r["label"]))
-                pdf.set_font("Helvetica", "B", 8); pdf.cell(22, 4.4, _san(r["value"]), align="R")
-                pdf.set_font("Helvetica", "I", 7.6); pdf.set_text_color(*GREY)
-                pdf.cell(0, 4.4, _san("  " + r.get("note", "")), ln=1)
-                pdf.set_text_color(0, 0, 0)
+            return f"{fm['name'].upper()}  {pts}  ({scp})"
 
-        for fm in sc.get("families", []):
-            _fam(fm)
+        def _short(lbl):
+            return _re.sub(r"\s*\(.*?\)", "", lbl or "")
+
+        def _full(fm):  # Value / Quality -> one row per metric (value + note)
+            pdf.ln(0.4); pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 8.6); pdf.set_text_color(*NAVY)
+            pdf.cell(0, 4.8, _san(_head(fm)), ln=1); pdf.set_text_color(0, 0, 0)
+            for r in fm["rows"]:
+                pdf.set_x(pdf.l_margin + 2); pdf.set_font("Helvetica", "B", 8); pdf.set_text_color(*MK.get(r.get("sym"), GREY))
+                pdf.cell(4.5, 4.4, _san(f"[{r.get('sym','?')}]"))
+                pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 8); pdf.cell(42, 4.4, _san(r["label"]))
+                pdf.set_font("Helvetica", "B", 8); pdf.cell(20, 4.4, _san(r["value"]), align="R")
+                if r.get("note"):
+                    pdf.set_font("Helvetica", "I", 7.6); pdf.set_text_color(*GREY); pdf.cell(0, 4.4, _san("  " + r["note"]))
+                    pdf.set_text_color(0, 0, 0)
+                pdf.ln(4.4)
+
+        def _compact(fm):  # Growth / Safety / Momentum / Payout -> single line
+            pdf.ln(0.4); pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 8.6); pdf.set_text_color(*NAVY)
+            pdf.cell(46, 4.8, _san(_head(fm))); pdf.set_text_color(0, 0, 0)
+            if fm["score"] is None:
+                note = (fm["rows"][0].get("note") if fm["rows"] else "") or "skipped"
+                pdf.set_font("Helvetica", "I", 7.6); pdf.set_text_color(*GREY)
+                pdf.multi_cell(EPW - 46, 4.8, _san(note)); pdf.set_text_color(0, 0, 0)
+            else:
+                bits = "   ".join(f"[{r.get('sym','?')}] {_short(r['label'])} {r['value']}"
+                                  for r in fm["rows"])
+                pdf.set_font("Helvetica", "", 7.8)
+                pdf.multi_cell(EPW - 46, 4.8, _san(bits))
+
+        fams = {f["name"]: f for f in sc.get("families", [])}
+        for nm in ("Value", "Quality"):
+            if nm in fams:
+                _full(fams[nm])
+        for nm in ("Growth", "Safety", "Momentum", "Payout"):
+            if nm in fams:
+                _compact(fams[nm])
 
         bk = sc.get("bank_kpis")
         if bk:
@@ -332,14 +355,14 @@ def build(result: dict, out_path: str) -> str:
             pdf.ln(0.6); para(f"Bank KPIs (Screener/MC Pro):  {kpi}", 7.8, "B")
         if sc.get("flags"):
             pdf.ln(0.6); pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 8); pdf.set_text_color(*RED)
-            pdf.cell(0, 4.4, _san("Outlier flags (skip/distrust rules):"), ln=1); pdf.set_text_color(0, 0, 0)
+            pdf.cell(0, 4.4, _san("Outlier flags:"), ln=1); pdf.set_text_color(0, 0, 0)
             for nm, why in sc["flags"]:
                 pdf.set_x(pdf.l_margin + 2); pdf.set_font("Helvetica", "", 7.8)
                 pdf.multi_cell(EPW - 2, 4.0, _san(f"! {nm}: {why}"))
         pdf.ln(0.4)
         para(f"Sector note: {sc.get('sector_note','')}", 7, "I")
-        para("Legend: [+] strong  [~] ok  [x] weak  [?] missing. Score = weighted Value/Quality/Growth/"
-             "Safety/Momentum/Payout, sector-adapted, with value/quality gates. Educational, not advice.", 6.8, "I")
+        para("[+] strong  [~] ok  [x] weak  [?] missing.  Weighted Value/Quality/Growth/Safety/Momentum/Payout, "
+             "sector-adapted, with value/quality gates. Educational, not advice.", 6.8, "I")
 
     pdf.output(out_path)
     return out_path

@@ -42,6 +42,28 @@ def _parse_scorecard(text: str):
     return None
 
 
+# One-message command list. Post /help, /start or /commands to get it.
+_HELP_CMD = re.compile(r"^/(?:help|start|commands)(?:@\w+)?\s*$", re.IGNORECASE)
+HELP_TEXT = (
+    "🤖 *Stock Bot — commands*\n"
+    "\n"
+    "📄 *Research*\n"
+    "`/stock RELIANCE` — full research *PDF* (snapshot · 5Y financials · forensic scores · quant · technicals · S/R · verdict · Financial-Valuations scorecard)\n"
+    "`/scorecard RELIANCE` — quick *valuation scorecard* (text): composite /100 + grade + Value/Quality/Growth/Safety/Momentum/Payout breakdown + flags\n"
+    "   _same as_ `/valuation RELIANCE` · `/stock valuation-scorecard RELIANCE`\n"
+    "\n"
+    "🔔 *Price alerts*\n"
+    "`/alert RELIANCE below 1250` — ping when price falls to/below 1250\n"
+    "`/alert RELIANCE above 1400` — ping when price rises to/above 1400\n"
+    "`/alert RELIANCE` — auto levels (computed S1 below, R1 above)\n"
+    "`/alerts` — list your active alerts\n"
+    "`/stock RELIANCE alert delete` — remove alerts for a stock\n"
+    "\n"
+    "ℹ️ `/help` — show this list\n"
+    "_Use the exact NSE symbol (e.g. RELIANCE). Educational, not SEBI-registered advice._"
+)
+
+
 def _message(update: dict):
     """Return (chat_id, text) for a user message/channel post, else None."""
     msg = update.get("message") or update.get("channel_post")
@@ -87,6 +109,13 @@ def run_once() -> int:
         chat_id, text = parsed
         if allowed and chat_id != allowed:
             print(f"Ignoring message from non-allowed chat {chat_id}")
+            continue
+
+        # /help | /start | /commands -> the one-message command list.
+        if _HELP_CMD.match(text):
+            print(f"Command: help from chat {chat_id}")
+            telegram.send_message(chat_id, HELP_TEXT)
+            processed += 1
             continue
 
         # Let the alerts handler take any alert command (/alert, @alert, /alerts,

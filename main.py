@@ -29,6 +29,16 @@ def main(argv=None) -> None:
 
     sym = args.symbol.strip().upper()
 
+    # --- help / command list ---
+    if sym in ("HELP", "COMMANDS", "START"):
+        from poller import HELP_TEXT
+        if args.send and args.chat:
+            resp = telegram.send_message(args.chat, HELP_TEXT)
+            print("Telegram:", "SENT help" if resp.get("ok") else resp)
+        else:
+            print(HELP_TEXT)
+        return
+
     # --- text scorecard mode (no PDF) ---
     if args.scorecard:
         print(f"Scoring {sym} ...")

@@ -44,6 +44,12 @@ It reuses the same Telegram bot (`@Analysis_Stock_Alert_bot`); the bot only ever
    RS vs Nifty, profit YoY, fwd-PE re-rating, OI buildup, SAST/bulk, T2T tag).
    Reuses the `unusual-activity` engine; drives it off the report's yfinance data
    plus best-effort NSE feeds (degrades to yfinance-only if NSE is blocked).
+10. **Financial Valuations** — a sector-aware **hedge-fund multi-factor scorecard**:
+    six factor families (Value · Quality · Growth · Safety · Momentum · Payout) →
+    a **0-100 composite + grade + verdict**. The lens adapts to the sector (P/B +
+    GNPA/NNPA/NIM for banks, EV/EBITDA/P-B for cyclicals, EV/Sales for loss-makers,
+    P/E otherwise), with outlier skip-rules, value/quality gates, an investment
+    archetype and a confidence read. Every metric shows its value + a plain note.
 
 ## Price-level alerts (support / resistance)
 

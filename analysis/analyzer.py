@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from analysis import data as datamod
-from analysis import forensic, quant, technicals, valuation, verdict
+from analysis import forensic, quant, scorecard, technicals, valuation, verdict
 from momentum import engine as momentum_engine
 from report import pdf as pdfmod
 
@@ -59,6 +59,13 @@ def analyze(symbol: str, out_pdf: str) -> dict:
     # failure it returns {"ok": False} and the PDF renders the section as n/a.
     mom = momentum_engine.compute(d.symbol, d.price, d.info, d.nifty)
 
+    # Sector-aware multi-factor valuation scorecard (final PDF section). Best-effort.
+    try:
+        sc = scorecard.compute({**d.info, "symbol": d.symbol}, {**snap, "symbol": d.symbol},
+                               fore, qt, tech, d.financials, d.balance_sheet)
+    except Exception as exc:  # noqa: BLE001 — never let scoring break the report
+        sc = {"error": str(exc)}
+
     result = {
         "ok": True,
         "symbol": d.symbol,
@@ -72,6 +79,7 @@ def analyze(symbol: str, out_pdf: str) -> dict:
         "verdict": vd,
         "financials_table": fin_tbl,
         "momentum": mom,
+        "scorecard": sc,
     }
     result["pdf"] = pdfmod.build(result, out_pdf)
     return result

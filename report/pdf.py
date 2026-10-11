@@ -131,6 +131,16 @@ def build(result: dict, out_path: str) -> str:
     z = verdict["zones"]
     para(f"Buy zone {z['buy_zone']}  |  CMP {z['cmp']}  |  Upside {z['upside_zone']}  |  Invalidation {z['invalidation']}", 8, "B")
 
+    # ---- About the company: what it does, sector ----
+    ab = result.get("about") or {}
+    sec("About the company")
+    if ab.get("what"):
+        para(ab["what"], 8.4)
+    else:
+        para("Business description unavailable for this stock (n/a).", 8, "I")
+    para(f"Sector: {ab.get('sector') or 'n/a'}   |   Industry: {ab.get('industry') or 'n/a'}   |   "
+         f"Valued as: {ab.get('lens_sector') or 'n/a'} (lens {ab.get('lens') or 'n/a'})", 8, "B")
+
     # ---- 1. Snapshot ----
     sec("1. Snapshot")
     kv([
@@ -364,7 +374,27 @@ def build(result: dict, out_path: str) -> str:
         para("[+] strong  [~] ok  [x] weak  [?] missing.  Weighted Value/Quality/Growth/Safety/Momentum/Payout, "
              "sector-adapted, with value/quality gates. Educational, not advice.", 6.8, "I")
 
-    # ---- 11. Kronos price prediction (small, last) ----
+    # ---- 11. Latest news + sentiment ----
+    nw = result.get("news") or {}
+    sec("11. Latest news (last 30 days)  -  headline sentiment")
+    items = nw.get("items") or []
+    if not items:
+        para("No recent news found" + (f" ({nw.get('error')})" if nw.get("error") else "") + ".", 8, "I")
+    else:
+        sm = nw.get("summary") or {}
+        col = {"Positive": GREEN, "Negative": RED}.get(sm.get("label"), GREY)
+        pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 9.5); pdf.set_text_color(*col)
+        pdf.multi_cell(EPW, 5, _san(f"Overall tone: {sm.get('label')}   ({sm.get('pos', 0)} positive, {sm.get('neg', 0)} negative, "
+                                    f"{sm.get('neu', 0)} neutral of {len(items)})"))
+        pdf.set_text_color(0, 0, 0)
+        for it in items:
+            tag = {"Positive": "[+]", "Negative": "[-]"}.get(it["label"], "[~]")
+            pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 8); pdf.set_text_color(*({"[+]": GREEN, "[-]": RED}.get(tag, GREY)))
+            pdf.cell(7, 4.2, tag); pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 8)
+            pdf.multi_cell(EPW - 7, 4.2, _san(f"{it['title']}  ({it['source']}, {it['date']})"))
+        para("Tone is read from headline words only (not the articles) and is not a forecast. Verify on the source / exchange filings.", 6.8, "I")
+
+    # ---- 12. Kronos price prediction (small, last) ----
     if result.get("kronos") is not None:
         from report import kronos_section
         kronos_section.draw(pdf, result["kronos"], _san, (NAVY, GREY, LGREY, WHITE, TEAL))

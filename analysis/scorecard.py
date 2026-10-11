@@ -54,6 +54,10 @@ SECTORS = {
     "chemical":    dict(name="Chemicals", lens="P/E", q="roce", q_good=18, normal_pe=28, pe_like=True,
                         cfo_ok=True, bench="P/E ~30x",
                         note="Chemicals -> spreads, capacity utilization, capex cycle, end-market mix."),
+    "industrial":  dict(name="Industrials / Electrical equipment", lens="P/E", q="roce", q_good=16, normal_pe=28, pe_like=True,
+                        cfo_ok=True, bench="P/E ~30x", opm=(10, 1.5),
+                        note="Industrial/electrical manufacturer -> order book, capacity utilisation, working-capital days. Raw-material (copper/steel) is passed "
+                             "through to customers, so a THIN operating margin is normal here and is judged on a lower bar; cash conversion dips while it scales."),
     "utility":     dict(name="Utility/Power", lens="P/E", q="roce", q_good=12, normal_pe=15, pe_like=True,
                         cfo_ok=True, bench="P/E ~15x",
                         note="Utility -> PLF, regulated RoE, receivable days (discom dues)."),
@@ -88,7 +92,9 @@ def _classify(info, symbol, pe, net_income, eps):
     if any(k in text for k in ["food", "beverage", "household", "personal product", "tobacco", "staple", "consumer defensive", "packaged"]): return "fmcg", loss
     if any(k in text for k in ["real estate", "realty"]): return "realty", loss
     if "chemical" in text: return "chemical", loss
-    if any(k in text for k in ["utilit", "power", "electric"]): return "utility", loss
+    if any(k in text for k in ["electrical equipment", "machinery", "engineering", "industrial", "capital goods", "building product",
+                               "construction", "conglomerate", "cable", "wire", "electrical component"]): return "industrial", loss
+    if any(k in text for k in ["utilit", "independent power", "power producer", "renewable", "power generation"]): return "utility", loss
     if "financial services" in sec: return "capital_mkts", loss
     return "generic", loss
 
@@ -275,7 +281,7 @@ def compute(info, snap, fore, quant, tech, financials, balance_sheet):
     rs = quant.get("rs_vs_nifty_pct")
     a200 = tech.get("px_vs_200dma_pct")
 
-    sec_key, loss = _classify(info, snap.get("name"), pe, net_income, eps)
+    sec_key, loss = _classify(info, snap.get("symbol") or info.get("symbol"), pe, net_income, eps)
     if loss and sec_key not in ("bank", "nbfc", "insurance"):
         cfg = dict(SECTORS["loss_making"])
         cfg["note"] = f"{SECTORS['loss_making']['note']}  (Underlying sector: {SECTORS[sec_key]['name']}.)"
@@ -334,7 +340,8 @@ def compute(info, snap, fore, quant, tech, financials, balance_sheet):
         qg = cfg["q_good"]
         quality = [_M("ROCE / ROE", roce or roe, _s_hi(roce or roe, qg * 1.1, qg * 0.4), P, "elite returns on capital", "decent", "low returns on capital"),
                    _M("Gross profitability", gpa, _s_hi(gpa, 0.4, 0.05), N, "very productive assets", "ok", "low gross profitability"),
-                   _M("Operating margin", opm, _s_hi(opm, 18, 2), P, "fat margins", "moderate", "thin margins"),
+                   _M("Operating margin", opm, _s_hi(opm, *cfg.get("opm", (18, 2))), P, "fat margins" if "opm" not in cfg else "healthy for this sector",
+                       "moderate" if "opm" not in cfg else "normal thin pass-through margin", "thin margins"),
                    _M("CFO / PAT (cash)", cfo_pat, _s_hi(cfo_pat, 1.0, 0.3), N, "profits = real cash", "okay conversion", "weak - profit > cash"),
                    _M("Accruals", (acc * 100 if acc is not None else None), (_s_lo(acc, 0.03, 0.15) if acc is not None else None), P, "clean, cash-backed", "some accruals", "high accruals - paper-profit risk")]
     if growth_ok:

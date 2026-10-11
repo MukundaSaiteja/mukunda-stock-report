@@ -106,3 +106,10 @@ If Kronos fails or its answer is not believable (more than 3x the stock's normal
 In our tests Kronos was a coin flip, so this is not a price target. Kill switch: repo variable `KRONOS_ENABLED=0`.
 Speed: Kronos runs for 5 and 30 days only (21 steps, 16 paths, 150 s cap); the 6-month row shows the normal range and "not run" because its 126-step
 rollout took 6-7 min on the free runner. Set `KRONOS_MAX_SESSIONS=126` (workflow env) to run it anyway.
+
+## One report with everything (what `/stock` now contains)
+- **About the company** (top): what it does, sector, industry, and which sector lens the scorecard used.
+- **11. Latest news (last 30 days)**: Google News headlines that name the company, each tagged [+] / [-] / [~] with an overall tone
+  (Positive / Negative / Mixed / Neutral). Headline words only, not the articles (`analysis/news.py`).
+- **Scorecard sector fix**: electrical / machinery / engineering makers are now "Industrials" (they were filed under Utility because
+  the word "electric" matched), with a lower operating-margin bar because copper/steel cost is passed through to customers.

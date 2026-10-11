@@ -48,7 +48,7 @@ HELP_TEXT = (
     "🤖 *Stock Bot — commands*\n"
     "\n"
     "📄 *Research*\n"
-    "`/stock RELIANCE` — full research *PDF* (snapshot · 5Y financials · forensic scores · quant · technicals · S/R · verdict · Financial-Valuations scorecard)\n"
+    "`/stock RELIANCE` — full research *PDF* (what the company does · sector · snapshot · 5Y financials · forensic scores · quant · technicals · S/R · verdict · Financial-Valuations scorecard · latest news + sentiment · Kronos prediction)\n"
     "`/scorecard RELIANCE` — quick *valuation scorecard* (text): composite /100 + grade + Value/Quality/Growth/Safety/Momentum/Payout breakdown + flags\n"
     "   _same as_ `/valuation RELIANCE` · `/stock valuation-scorecard RELIANCE`\n"
     "\n"

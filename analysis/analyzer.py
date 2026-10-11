@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from analysis import data as datamod
-from analysis import forensic, quant, scorecard, technicals, valuation, verdict
+from analysis import forensic, news as newsmod, profile, quant, scorecard, technicals, valuation, verdict
 from momentum import engine as momentum_engine
 from outlook import runner as outlook_runner
 from report import pdf as pdfmod
@@ -67,6 +67,10 @@ def analyze(symbol: str, out_pdf: str, with_kronos: bool = True) -> dict:
     except Exception as exc:  # noqa: BLE001 — never let scoring break the report
         sc = {"error": str(exc)}
 
+    # What the company does + sector, and the latest news with a headline-tone read. Both best-effort.
+    about = profile.build(d.info, sc)
+    news = newsmod.fetch(d.symbol, snap.get("name"))
+
     # Kronos price prediction (final PDF section). Runs in a child process with a hard time limit; on any
     # failure the PDF just says it was unavailable. Not run for tests/other callers unless KRONOS_ENABLED != 0.
     try:
@@ -89,6 +93,8 @@ def analyze(symbol: str, out_pdf: str, with_kronos: bool = True) -> dict:
         "momentum": mom,
         "scorecard": sc,
         "kronos": kr,
+        "about": about,
+        "news": news,
     }
     result["pdf"] = pdfmod.build(result, out_pdf)
     return result

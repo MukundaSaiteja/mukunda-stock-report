@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .core import Outlook, pct
 
-TITLE = "11. Kronos price prediction (experimental)"
+TITLE = "12. Kronos price prediction (experimental)"
 # Test evidence by horizon in trading sessions (random Nifty 500 stocks, Kronos-small, 400 bars of context):
 #   n = forecasts scored; direction = % whose up/down call was right (50 = coin flip); held = % the stock's own normal range held (target 80).
 EVIDENCE = {5: dict(n=813, direction=50, held=81), 21: dict(n=150, direction=50, held=79), 126: dict(n=38, direction=42, held=72)}

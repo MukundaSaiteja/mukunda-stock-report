@@ -44,21 +44,31 @@ def build(engine, df=None, **kw):
     return core.build("AAA", prices() if df is None else df, engine, cfg=Config(n_paths=16, batch=8), now=EVENING, **kw)
 
 
+def test_default_runs_kronos_to_30_days_only_and_asks_for_21_steps():
+    eng = Scripted({5: 0.01, 21: 0.02, 126: 0.04}); seen = []
+    orig = eng.sample
+    eng.sample = lambda c, *, horizon, **kw: (seen.append(horizon), orig(c, horizon=horizon, **kw))[1]
+    o = build(eng)
+    assert set(seen) == {21} and [s.kronos is not None for s in o.steps] == [True, True, False] and o.steps[2].skipped
+    assert [r[2] for r in text.table_rows(o)][1:] == [text.rs(o.steps[0].kronos), text.rs(o.steps[1].kronos), "not run"]
+    assert "Kronos was not run for 6 months" in " ".join(text.notes(o))
+
+
 def test_plausible_run_shows_all_three_rows_with_a_range():
-    o = build(Scripted({5: 0.01, 21: 0.02, 126: 0.04}))
+    o = core.build("AAA", prices(), Scripted({5: 0.01, 21: 0.02, 126: 0.04}), cfg=Config(n_paths=16, batch=8, max_sessions=126), now=EVENING)
     assert o.status == "ok" and o.paths == 16 and all(s.kronos for s in o.steps)
     assert [s.sessions for s in o.steps] == [5, 21, 126] and all(s.low < o.last_close < s.high for s in o.steps)
 
 
 def test_broken_first_week_withholds_every_longer_row():
     o = build(Scripted({5: -0.77, 21: -0.2, 126: -0.05}))
-    assert [s.kronos for s in o.steps] == [None] * 3 and "not believable" in o.steps[0].note
-    line = text.notes(o)[0]
-    assert line.startswith("Kronos not shown for 5 days") and "(30 days and 6 months) are not shown either" in line
+    assert [s.kronos for s in o.steps] == [None] * 3 and o.steps[2].skipped and "not believable" in o.steps[0].note
+    line = next(n for n in text.notes(o) if n.startswith("Kronos not shown"))
+    assert line.startswith("Kronos not shown for 5 days") and "The longer forecast (30 days) is not shown either" in line
 
 
 def test_a_good_week_does_not_save_a_broken_month():
-    o = build(Scripted({5: 0.01, 21: 0.7, 126: 0.02}))
+    o = core.build("AAA", prices(), Scripted({5: 0.01, 21: 0.7, 126: 0.02}), cfg=Config(n_paths=16, batch=8, max_sessions=126), now=EVENING)
     assert o.steps[0].kronos is not None and o.steps[1].kronos is None and o.steps[2].kronos is None
 
 

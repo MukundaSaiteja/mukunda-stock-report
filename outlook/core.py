@@ -7,6 +7,7 @@ Z_LIMIT times the stock's own normal move for that distance, and then every long
 from __future__ import annotations
 
 import math
+import os
 import time
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -30,9 +31,12 @@ class EngineError(RuntimeError):
 class Config:
     model: str = "small"
     lookback: int = LOOKBACK
-    n_paths: int = 24
+    n_paths: int = 16
     batch: int = 8
-    budget_s: float = 420.0
+    budget_s: float = 150.0
+    # Longest horizon Kronos is run for. The 126-step 6-month rollout costs 6x the 21-step one and is too slow on a free CI
+    # runner (6-7 min measured); set KRONOS_MAX_SESSIONS=126 to run it anyway.
+    max_sessions: int = int(os.environ.get("KRONOS_MAX_SESSIONS", "21"))
     seed: int = 7
     z_limit: float = Z_LIMIT
 
@@ -46,6 +50,7 @@ class Step:
     high: float
     kronos: float | None = None
     note: str = ""
+    skipped: bool = False  # Kronos was not run for this horizon (too slow here), only the normal range is shown
 
     def stretched(self) -> bool:
         return self.kronos is not None and not self.low <= self.kronos <= self.high
@@ -130,6 +135,7 @@ def build(symbol: str, df: pd.DataFrame, engine, *, exchange: str = "NSE", cfg: 
     if bad or not vol > 0:
         return Outlook(status="none", note=(bad + ", so no honest range can be drawn") if bad else "the price did not move recently", **base)
     longest = max(s for s, _ in horizons)
+    run = [h for h in horizons if h[0] <= cfg.max_sessions] or horizons[:1]
     days = future_days(df.index[-1], longest)
 
     def step(label, sessions, **kw) -> Step:
@@ -147,13 +153,16 @@ def build(symbol: str, df: pd.DataFrame, engine, *, exchange: str = "NSE", cfg: 
         checkpoint(range_only("the Kronos run did not finish in time"))
     try:
         engine.load()
-        paths = draw_paths(engine, df, cfg, longest, deadline)
+        paths = draw_paths(engine, df, cfg, max(s for s, _ in run), deadline)
     except EngineError as exc:
         return range_only(str(exc))
     if len(paths) < max(3, cfg.n_paths // 3):
         return range_only(f"only {len(paths)} usable futures fit in the time allowed")
     steps, broken = [], ""
     for s, label in horizons:
+        if (s, label) not in run:
+            steps.append(step(label, s, skipped=True, note="not run"))
+            continue
         moves = paths[:, s - 1, 3] / last - 1
         median = float(np.median(moves))
         z = median / (vol * math.sqrt(s))
@@ -170,11 +179,11 @@ def build(symbol: str, df: pd.DataFrame, engine, *, exchange: str = "NSE", cfg: 
 def to_json(o: Outlook) -> dict:
     return dict(symbol=o.symbol, exchange=o.exchange, asof=o.asof.isoformat(), last_close=o.last_close, bars=o.bars, status=o.status,
                 note=o.note, paths=o.paths, cfg=dict(model=o.cfg.model, lookback=o.cfg.lookback, seed=o.cfg.seed),
-                steps=[dict(label=s.label, sessions=s.sessions, day=s.day.isoformat(), low=s.low, high=s.high, kronos=s.kronos, note=s.note)
+                steps=[dict(label=s.label, sessions=s.sessions, day=s.day.isoformat(), low=s.low, high=s.high, kronos=s.kronos, note=s.note, skipped=s.skipped)
                        for s in o.steps])
 
 
 def from_json(d: dict) -> Outlook:
     cfg = Config(**d["cfg"])
-    steps = tuple(Step(s["label"], s["sessions"], date.fromisoformat(s["day"]), s["low"], s["high"], s["kronos"], s["note"]) for s in d["steps"])
+    steps = tuple(Step(s["label"], s["sessions"], date.fromisoformat(s["day"]), s["low"], s["high"], s["kronos"], s["note"], s.get("skipped", False)) for s in d["steps"])
     return Outlook(d["symbol"], d["exchange"], date.fromisoformat(d["asof"]), d["last_close"], d["bars"], d["status"], cfg, d["note"], steps, d["paths"])

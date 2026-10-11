@@ -27,7 +27,7 @@ def table_rows(o: Outlook) -> list[list[str]]:
     for s in o.steps:
         change = "n/a" if s.kronos is None else pct(s.kronos / o.last_close - 1) + ("*" if s.stretched() else "")
         rows.append([s.label, ("about " if s.sessions > 60 else "") + f"{s.day:%d-%b-%Y}",
-                     "not shown" if s.kronos is None else rs(s.kronos), change, f"{rs(s.low)} - {rs(s.high)}"])
+                     ("not run" if s.skipped else "not shown") if s.kronos is None else rs(s.kronos), change, f"{rs(s.low)} - {rs(s.high)}"])
     return rows
 
 
@@ -47,7 +47,10 @@ def notes(o: Outlook) -> list[str]:
     out = []
     if any(s.stretched() for s in o.steps):
         out.append("* Kronos's guess is outside this stock's normal range for that time, so treat it with extra caution.")
-    hidden = [s for s in o.steps if s.kronos is None]
+    skipped = [s.label for s in o.steps if s.skipped]
+    if o.status == "ok" and skipped:
+        out.append(f"Kronos was not run for {_join(skipped)}: that forecast takes about six times longer than the rest and, in our tests, was the least reliable.")
+    hidden = [s for s in o.steps if s.kronos is None and not s.skipped]
     if o.status == "ok" and hidden:
         later = [s.label for s in hidden[1:]]
         line = f"Kronos not shown for {hidden[0].label}: {hidden[0].note}."
@@ -62,5 +65,5 @@ def notes(o: Outlook) -> list[str]:
 def method_line(o: Outlook) -> str:
     kronos = (f"Kronos-{o.cfg.model}, {min(o.bars, o.cfg.lookback)} daily bars of context, {o.paths} imagined futures, seed {o.cfg.seed} "
               "(a re-run can move a figure by a few points); " if o.paths else "Kronos not shown; ")
-    return (f"Method: {kronos}30 days = 21 and 6 months = 126 trading sessions. Normal range = today's price x (1 +/- 1.28 x daily move "
+    return (f"Method: {kronos}30 days = 21 and 6 months = 126 trading sessions (the normal range uses the same days). Normal range = today's price x (1 +/- 1.28 x daily move "
             "over the last 60 sessions x square root of the days). Yahoo prices, split and dividend adjusted; dates assume normal trading days.")

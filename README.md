@@ -104,3 +104,5 @@ normal range. Code is in `outlook/` (vendored from the research repo's `kronos-f
 Kronos runs in a child process with a hard time limit; torch (CPU) and the pinned Kronos code are installed on demand in CI only.
 If Kronos fails or its answer is not believable (more than 3x the stock's normal move), that row shows "not shown" and the range stays.
 In our tests Kronos was a coin flip, so this is not a price target. Kill switch: repo variable `KRONOS_ENABLED=0`.
+Speed: Kronos runs for 5 and 30 days only (21 steps, 16 paths, 150 s cap); the 6-month row shows the normal range and "not run" because its 126-step
+rollout took 6-7 min on the free runner. Set `KRONOS_MAX_SESSIONS=126` (workflow env) to run it anyway.

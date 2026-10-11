@@ -364,5 +364,10 @@ def build(result: dict, out_path: str) -> str:
         para("[+] strong  [~] ok  [x] weak  [?] missing.  Weighted Value/Quality/Growth/Safety/Momentum/Payout, "
              "sector-adapted, with value/quality gates. Educational, not advice.", 6.8, "I")
 
+    # ---- 11. Kronos price prediction (small, last) ----
+    if result.get("kronos") is not None:
+        from report import kronos_section
+        kronos_section.draw(pdf, result["kronos"], _san, (NAVY, GREY, LGREY, WHITE, TEAL))
+
     pdf.output(out_path)
     return out_path

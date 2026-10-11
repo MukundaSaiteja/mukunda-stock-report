@@ -5,3 +5,4 @@ venv/
 *.pdf
 .env
 .DS_Store
+.kronos/

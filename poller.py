@@ -154,7 +154,7 @@ def run_once() -> int:
             continue
         symbol = m.group(1).upper()
         print(f"Command: /stock {symbol} from chat {chat_id}")
-        telegram.send_message(chat_id, f"📄 Analyzing *{symbol}* — PDF shortly...")
+        telegram.send_message(chat_id, f"📄 Analyzing *{symbol}* — PDF in a few minutes (includes the Kronos price prediction)...")
         out = os.path.join(tempfile.gettempdir(), f"{symbol}_report.pdf")
         try:
             result = analyze(symbol, out)

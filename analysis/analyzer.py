@@ -7,6 +7,7 @@ import pandas as pd
 from analysis import data as datamod
 from analysis import forensic, quant, scorecard, technicals, valuation, verdict
 from momentum import engine as momentum_engine
+from outlook import runner as outlook_runner
 from report import pdf as pdfmod
 
 
@@ -41,7 +42,7 @@ def _financials_table(fin: pd.DataFrame | None, cf: pd.DataFrame | None) -> dict
     return {"years": years, "rows": rows}
 
 
-def analyze(symbol: str, out_pdf: str) -> dict:
+def analyze(symbol: str, out_pdf: str, with_kronos: bool = True) -> dict:
     """Run everything. Returns a result dict incl. 'ok', 'error', and 'pdf'."""
     d = datamod.fetch(symbol)
     if not d.ok:
@@ -66,6 +67,13 @@ def analyze(symbol: str, out_pdf: str) -> dict:
     except Exception as exc:  # noqa: BLE001 — never let scoring break the report
         sc = {"error": str(exc)}
 
+    # Kronos price prediction (final PDF section). Runs in a child process with a hard time limit; on any
+    # failure the PDF just says it was unavailable. Not run for tests/other callers unless KRONOS_ENABLED != 0.
+    try:
+        kr = outlook_runner.run(d.symbol) if with_kronos else outlook_runner.Result(None, "not requested")
+    except Exception as exc:  # noqa: BLE001
+        kr = outlook_runner.Result(None, f"error: {exc}")
+
     result = {
         "ok": True,
         "symbol": d.symbol,
@@ -80,6 +88,7 @@ def analyze(symbol: str, out_pdf: str) -> dict:
         "financials_table": fin_tbl,
         "momentum": mom,
         "scorecard": sc,
+        "kronos": kr,
     }
     result["pdf"] = pdfmod.build(result, out_pdf)
     return result

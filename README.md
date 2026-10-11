@@ -97,3 +97,10 @@ TELEGRAM_BOT_TOKEN=... python main.py --symbol RELIANCE --send --chat <id>
 - Latency ~5 min (polling interval); GitHub cron can add delay.
 - yfinance is the backbone; some fundamentals may be `n/a` on a given run (shown, never guessed).
 - India-first, exact NSE symbol most reliable.
+
+## Kronos price prediction (section 11, experimental)
+The PDF ends with a small table: Kronos-predicted price and % vs today's price at 5 days, 30 days and 6 months, beside the stock's own
+normal range. Code is in `outlook/` (vendored from the research repo's `kronos-forecast`; same guards and test evidence in `outlook/text.py`).
+Kronos runs in a child process with a hard time limit; torch (CPU) and the pinned Kronos code are installed on demand in CI only.
+If Kronos fails or its answer is not believable (more than 3x the stock's normal move), that row shows "not shown" and the range stays.
+In our tests Kronos was a coin flip, so this is not a price target. Kill switch: repo variable `KRONOS_ENABLED=0`.

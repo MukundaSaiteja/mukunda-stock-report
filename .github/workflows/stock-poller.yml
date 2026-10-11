@@ -27,6 +27,13 @@ permissions:
 jobs:
   poll:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      # Kronos prediction section: heavy deps are installed on demand, only when a /stock PDF is built.
+      # Kill switch: set repo variable KRONOS_ENABLED=0 (Settings > Variables) to drop the section without a code push.
+      KRONOS_AUTOINSTALL: "1"
+      KRONOS_ENABLED: ${{ vars.KRONOS_ENABLED || '1' }}
+      KRONOS_TIMEOUT: "900"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

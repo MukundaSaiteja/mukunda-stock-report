@@ -123,3 +123,36 @@ def fetch(symbol: str, name: str | None = None, now: datetime | None = None) -> 
         return dict(ok=True, items=items, summary=overall(items), error="")
     except Exception as exc:  # noqa: BLE001 - news must never break the report
         return dict(ok=False, items=[], summary=overall([]), error=str(exc)[:120])
+
+
+def _is_factual(title: str) -> bool:
+    """Skip opinion pieces and multi-company lists: questions, 'stocks to watch', 'record dates', long comma lists."""
+    low = title.lower()
+    return not (title.rstrip().endswith("?") or title.count(",") >= 3 or
+                any(k in low for k in ("stocks to", "to watch", "record dates", "can ", "should you", "how your", "here's why", "what to expect")))
+
+
+# Exceptional developments, most important first: (label, pattern on the lower-case headline).
+KEY_RULES = (
+    ("Order / contract win", r"\b(bags?|wins?|won|secures?|secured|receives?|lands?|bagged)\b.*\b(orders?|contracts?|mandate)\b|\border (book|inflow|win)"),
+    ("Merger / acquisition", r"\b(acquisitions?|acquires?|acquired|merger|merges?|demerger|takeover|buyout|amalgamation|stake sale|open offer)\b"),
+    ("Guidance / outlook", r"\bguidance\b|\b(raises?|cuts?|lifts?|lowers?)\b.*\b(outlook|forecast|guidance)\b|\b(revenue|sales|profit|growth) target\b"),
+    ("Capacity / capex", r"\b(capex|capacity expansion|new plant|greenfield|brownfield|commissioning|commissions)\b"),
+    ("Fund raise", r"\b(qip|preferential (issue|allotment)|rights issue|fund ?raise|raises? rs|fpo)\b"),
+    ("Corporate action", r"\b(bonus|stock split|buyback|buy-back|special dividend)\b"),
+    ("Rating / target price", r"\b(upgrade[sd]?|downgrade[sd]?|initiates coverage|target price)\b"),
+    ("Regulatory / risk", r"\b(sebi|probe|raid|fraud|penalty|default|resigns?|resignation|investigation|insolvency)\b"),
+)
+
+
+def key_developments(items: list[dict], limit: int = 3) -> list[dict]:
+    """Up to ``limit`` headlines about an exceptional event, one per kind, most important kind first (then newest)."""
+    found, used = [], set()
+    items = [it for it in items if _is_factual(it["title"])]
+    for label_, pattern in KEY_RULES:
+        for it in items:                                   # items are newest first
+            if label_ not in used and re.search(pattern, it["title"].lower()):
+                used.add(label_)
+                found.append(dict(kind=label_, title=it["title"], source=it["source"], date=it["date"], label=it["label"]))
+                break
+    return found[:limit]

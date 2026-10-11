@@ -69,3 +69,29 @@ def test_electrical_equipment_is_industrial_not_utility_and_real_utilities_stay(
 def test_a_different_company_with_the_same_first_word_is_dropped():
     rss = RSS.replace("</channel>", "<item><title>Vidya Breweries lower circuit today - Univest</title><pubDate>Fri, 09 Oct 2026 11:00:00 GMT</pubDate><link>x</link></item></channel>")
     assert all("Breweries" not in i["title"] for i in news.parse(rss, news.tokens("Vidya Wires Limited", "VIDYAWIRES"), NOW))
+
+
+def _it(t, label="Positive"):
+    return dict(title=t, source="S", date="2026-10-09", label=label, score=1)
+
+
+def test_key_developments_pick_one_per_kind_most_important_first_and_cap_at_three():
+    items = [_it("Vidya Wires bags Rs 300 crore order from utility"), _it("Vidya Wires wins another contract"),
+             _it("Vidya Wires to acquire copper unit in Gujarat"), _it("Brokerage raises Vidya Wires target price, upgrade to buy"),
+             _it("Vidya Wires announces 1:1 bonus"), _it("Vidya Wires shares close flat")]
+    kd = news.key_developments(items)
+    assert [k["kind"] for k in kd] == ["Order / contract win", "Merger / acquisition", "Corporate action"]
+    assert kd[0]["title"].endswith("utility")                                    # the newest order headline, not the second one
+
+
+def test_key_developments_are_empty_for_ordinary_news_and_flag_guidance_and_risk():
+    assert news.key_developments([_it("Vidya Wires shares close flat"), _it("Vidya Wires AGM on 22 September")]) == []
+    kd = news.key_developments([_it("Vidya Wires raises FY27 revenue guidance", "Positive"), _it("SEBI probe into Vidya Wires promoter", "Negative")])
+    assert [k["kind"] for k in kd] == ["Guidance / outlook", "Regulatory / risk"]
+
+
+def test_opinion_questions_and_multi_company_lists_are_not_key_developments():
+    items = [_it("Dividend, Bonus Issue, Stock Split Record Dates to Mark: Reliance, Infosys, Adani, Tata"),
+             _it("Can Cupid's Capacity Expansion Turn Into an Earnings Inflection?"), _it("How Your 1 Cupid Stock Became 80 Shares: Bonus Allotment"),
+             _it("Cupid commissions new plant in Nashik")]
+    assert [k["title"] for k in news.key_developments(items)] == ["Cupid commissions new plant in Nashik"]

@@ -78,7 +78,19 @@ class PDF(FPDF):
         self.set_text_color(0, 0, 0)
 
 
+class _TooLong(Exception):
+    pass
+
+
 def build(result: dict, out_path: str) -> str:
+    """The report is at most 3 pages: if the key-developments box would push it to a 4th, it is left out."""
+    try:
+        return _build(result, out_path)
+    except _TooLong:
+        return _build({**result, "key_dev": []}, out_path)
+
+
+def _build(result: dict, out_path: str) -> str:
     snap = result["snapshot"]
     tech = result["technicals"]
     forensic = result["forensic"]
@@ -131,6 +143,19 @@ def build(result: dict, out_path: str) -> str:
     z = verdict["zones"]
     para(f"Buy zone {z['buy_zone']}  |  CMP {z['cmp']}  |  Upside {z['upside_zone']}  |  Invalidation {z['invalidation']}", 8, "B")
 
+    # ---- Key developments (only when the news has an exceptional event) ----
+    kd = result.get("key_dev") or []
+    if kd:
+        sec("Key developments (last 30 days)")
+        for k in kd:
+            tag = {"Positive": "[+]", "Negative": "[-]"}.get(k["label"], "[~]")
+            title = k["title"] if len(k["title"]) <= 105 else k["title"][:102].rsplit(" ", 1)[0] + "..."
+            pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 8)
+            pdf.set_text_color(*({"[+]": GREEN, "[-]": RED}.get(tag, GREY))); pdf.cell(7, 4.2, tag)
+            pdf.set_text_color(*NAVY); pdf.cell(EPW * 0.2, 4.2, _san(k["kind"]))
+            pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 8)
+            pdf.multi_cell(EPW - 7 - EPW * 0.2, 4.2, _san(f"{title} ({k['source']}, {k['date']})"))
+
     # ---- About the company: what it does, sector ----
     ab = result.get("about") or {}
     sec("About the company")
@@ -170,8 +195,10 @@ def build(result: dict, out_path: str) -> str:
     sec("2. Financials (annual, latest first)")
     if fin:
         pdf.set_font("Helvetica", "B", 7.6); pdf.set_x(pdf.l_margin)
-        keep = [i for i in range(len(fin["years"])) if any(str(r[i + 1]).strip().lower() not in ("nan", "n/a") for r in fin["rows"])]
-        fin = {"years": [fin["years"][i] for i in keep], "rows": [[r[0]] + [r[i + 1] for i in keep] for r in fin["rows"]]}
+        n_years = len(fin["years"])
+        rows_ = [[r[0]] + (list(r[1:]) + ["n/a"] * n_years)[:n_years] for r in fin["rows"]]     # short rows are padded, never crash
+        keep = [i for i in range(n_years) if any(str(r[i + 1]).strip().lower() not in ("nan", "n/a") for r in rows_)] or list(range(n_years))
+        fin = {"years": [fin["years"][i] for i in keep], "rows": [[r[0]] + [r[i + 1] for i in keep] for r in rows_]}
         cols = ["Metric"] + fin["years"]
         cw = EPW / len(cols)
         for cval in cols:
@@ -409,5 +436,7 @@ def build(result: dict, out_path: str) -> str:
         from report import kronos_section
         kronos_section.draw(pdf, result["kronos"], _san, (NAVY, GREY, LGREY, WHITE, TEAL))
 
+    if pdf.page_no() > 3 and result.get("key_dev"):
+        raise _TooLong
     pdf.output(out_path)
     return out_path

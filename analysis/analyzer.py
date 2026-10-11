@@ -71,6 +71,7 @@ def analyze(symbol: str, out_pdf: str, with_kronos: bool = True) -> dict:
     about = profile.build(d.info, sc)
     qres = quarterly.build(d.symbol, d.quarterly)
     news = newsmod.fetch(d.symbol, snap.get("name"))
+    key_dev = newsmod.key_developments(news.get("items") or [])
 
     # Kronos price prediction (final PDF section). Runs in a child process with a hard time limit; on any
     # failure the PDF just says it was unavailable. Not run for tests/other callers unless KRONOS_ENABLED != 0.
@@ -97,6 +98,7 @@ def analyze(symbol: str, out_pdf: str, with_kronos: bool = True) -> dict:
         "about": about,
         "quarterly": qres,
         "news": news,
+        "key_dev": key_dev,
     }
     result["pdf"] = pdfmod.build(result, out_pdf)
     return result

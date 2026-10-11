@@ -96,7 +96,7 @@ def build(result: dict, out_path: str) -> str:
     EPW = pdf.w - 2 * pdf.l_margin
 
     def sec(t):
-        pdf.ln(1); pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 10); pdf.set_text_color(*TEAL)
+        pdf.ln(0.5); pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 10); pdf.set_text_color(*TEAL)
         pdf.multi_cell(EPW, 5, _san(t)); pdf.set_text_color(0, 0, 0)
 
     def kv(pairs, ncol=2):
@@ -114,14 +114,14 @@ def build(result: dict, out_path: str) -> str:
 
     # ---- Cover ----
     pdf.add_page()
-    pdf.set_fill_color(*NAVY); pdf.rect(0, 0, pdf.w, 46, "F")
-    pdf.set_xy(0, 14); pdf.set_font("Helvetica", "B", 20); pdf.set_text_color(*WHITE)
+    pdf.set_fill_color(*NAVY); pdf.rect(0, 0, pdf.w, 34, "F")
+    pdf.set_xy(0, 9); pdf.set_font("Helvetica", "B", 18); pdf.set_text_color(*WHITE)
     pdf.cell(0, 10, _san(name), align="C", ln=1)
     pdf.set_font("Helvetica", "", 12)
     pdf.cell(0, 7, _san(f"{sym}  |  NSE  |  as of {result['as_of']}"), align="C")
-    pdf.set_text_color(0, 0, 0); pdf.set_y(52)
+    pdf.set_text_color(0, 0, 0); pdf.set_y(38)
     para(f"{snap.get('sector') or 'n/a'} / {snap.get('industry') or 'n/a'}", 10, "B")
-    pdf.ln(2)
+    pdf.ln(1)
 
     # Verdict box
     pdf.set_fill_color(*LGREY); pdf.set_x(pdf.l_margin)
@@ -170,6 +170,8 @@ def build(result: dict, out_path: str) -> str:
     sec("2. Financials (annual, latest first)")
     if fin:
         pdf.set_font("Helvetica", "B", 7.6); pdf.set_x(pdf.l_margin)
+        keep = [i for i in range(len(fin["years"])) if any(str(r[i + 1]).strip().lower() not in ("nan", "n/a") for r in fin["rows"])]
+        fin = {"years": [fin["years"][i] for i in keep], "rows": [[r[0]] + [r[i + 1] for i in keep] for r in fin["rows"]]}
         cols = ["Metric"] + fin["years"]
         cw = EPW / len(cols)
         for cval in cols:
@@ -188,7 +190,7 @@ def build(result: dict, out_path: str) -> str:
     qr = result.get("quarterly") or {}
     if pdf.get_y() > pdf.h - 80:
         pdf.add_page()            # keep the quarterly table in one piece
-    sec("2A. Quarterly results  -  latest quarter, vs previous quarter (QoQ) and vs same quarter last year (YoY)")
+    sec("3. Quarterly results  -  vs previous quarter (QoQ) and vs same quarter last year (YoY)")
     if not qr.get("ok"):
         para(f"Quarterly results unavailable ({qr.get('error') or 'n/a'}).", 8, "I")
     else:
@@ -209,11 +211,9 @@ def build(result: dict, out_path: str) -> str:
         para("Read: " + qr["verdict"] + ". " + qr["trend"], 8)
         if qr.get("stale"):
             para(qr["stale"], 7.4, "I")
-        para(f"Source: Screener.in quarterly results ({qr.get('basis')}), Yahoo for unrounded figures. Seasonal businesses are best read YoY; "
-             "QoQ shows momentum. Educational, not advice.", 6.8, "I")
 
     # ---- 3. Cash-flow quality & forensic ----
-    sec("3. Cash-flow quality & forensic scores")
+    sec("4. Cash-flow quality & forensic scores")
     kv([
         ("CFO / PAT", _num(forensic.get("cfo_pat"), 2)),
         ("Sloan accruals", _num(forensic.get("sloan_accruals"), 3)),
@@ -222,10 +222,9 @@ def build(result: dict, out_path: str) -> str:
         ("Debt / Equity", _num(forensic.get("debt_to_equity"), 2)),
         ("Interest coverage", _num(forensic.get("interest_coverage"), 1, "x")),
     ])
-    para("Beneish M-Score: n/a (needs full statement inputs). Forensic values are approximations from public statements.", 7, "I")
 
     # ---- 4. Quant factors ----
-    sec("4. Quant factors")
+    sec("5. Quant factors")
     kv([
         ("12-1 momentum", _num(quant.get("mom_12_1_pct"), 1, "%")),
         ("RS vs Nifty (1Y)", f"{_num(quant.get('rs_vs_nifty_pct'),1,'%')} ({quant.get('rs_state') or 'n/a'})"),
@@ -236,7 +235,7 @@ def build(result: dict, out_path: str) -> str:
     ])
 
     # ---- 5. Technicals ----
-    sec("5. Technicals")
+    sec("6. Technicals")
     kv([
         ("Last close", _num(tech.get("last_close"), 1)),
         ("50 / 200 DMA", f"{_num(tech.get('sma50'),1)} / {_num(tech.get('sma200'),1)}"),
@@ -258,7 +257,7 @@ def build(result: dict, out_path: str) -> str:
         pass
 
     # ---- 6. Support / Resistance ----
-    sec("6. Support / Resistance")
+    sec("7. Support / Resistance")
     sr = tech.get("support_resistance", {})
     kv([
         ("Pivot", _num(sr.get("pivot"), 1)),
@@ -270,19 +269,13 @@ def build(result: dict, out_path: str) -> str:
     ])
 
     # ---- 7. Analyst ----
-    sec("7. Analyst view")
+    sec("8. Analyst view")
     kv([
         ("Recommendation", val_analyst.get("recommendation") or "n/a"),
         ("# analysts", _num(val_analyst.get("num_analysts"), 0)),
         ("Target mean", _num(val_analyst.get("target_mean"), 1)),
         ("Target low / high", f"{_num(val_analyst.get('target_low'),1)} / {_num(val_analyst.get('target_high'),1)}"),
     ])
-
-    # ---- 8. Not covered ----
-    sec("8. Layers needing deep review (n/a here)")
-    para("Deep dated-news timeline & sentiment arc, management concall tone/credibility, "
-         "governance/promoter-pledge deep-dive, and the variant-view verdict require an "
-         "analyst/LLM pass and are NOT in this automated quant snapshot.", 8)
 
     # ---- 9. Momentum footprints (A-F) ----
     sec("9. Momentum footprints (A-F)  -  why it may be moving")
@@ -317,13 +310,6 @@ def build(result: dict, out_path: str) -> str:
                 pdf.set_text_color(0, 0, 0)
         if mom.get("verify"):
             pdf.ln(0.5); para("Verify next: " + "  ".join(mom["verify"]), 7.4, "I")
-        if not mom.get("nse_used"):
-            para("Note: NSE live feeds (D news / E open-interest / F stake+bulk) were unreachable "
-                 "this run - those groups reflect no data, not necessarily no event.", 7, "I")
-        para("Legend: A results  B accumulation  C valuation  D news  E derivatives/OI  F stake/bulk. "
-             "E exists only for F&O stocks; F needs a filed disclosure.", 6.8, "I")
-        para("Footprints, not advice - a move can be genuine news, an index event, or a pump.", 6.8, "I")
-
     # ---- 10. Financial Valuations (multi-factor scorecard) ----
     sc = result.get("scorecard") or {}
     sec("10. Financial Valuations  -  sector-aware multi-factor scorecard")
@@ -397,10 +383,7 @@ def build(result: dict, out_path: str) -> str:
             for nm, why in sc["flags"]:
                 pdf.set_x(pdf.l_margin + 2); pdf.set_font("Helvetica", "", 7.8)
                 pdf.multi_cell(EPW - 2, 4.0, _san(f"! {nm}: {why}"))
-        pdf.ln(0.4)
         para(f"Sector note: {sc.get('sector_note','')}", 7, "I")
-        para("[+] strong  [~] ok  [x] weak  [?] missing.  Weighted Value/Quality/Growth/Safety/Momentum/Payout, "
-             "sector-adapted, with value/quality gates. Educational, not advice.", 6.8, "I")
 
     # ---- 11. Latest news + sentiment ----
     nw = result.get("news") or {}
@@ -420,9 +403,8 @@ def build(result: dict, out_path: str) -> str:
             pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 8); pdf.set_text_color(*({"[+]": GREEN, "[-]": RED}.get(tag, GREY)))
             pdf.cell(7, 4.2, tag); pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 8)
             pdf.multi_cell(EPW - 7, 4.2, _san(f"{it['title']}  ({it['source']}, {it['date']})"))
-        para("Tone is read from headline words only (not the articles) and is not a forecast. Verify on the source / exchange filings.", 6.8, "I")
 
-    # ---- 12. Kronos price prediction (small, last) ----
+    # ---- 11. Kronos price prediction (small, last) ----
     if result.get("kronos") is not None:
         from report import kronos_section
         kronos_section.draw(pdf, result["kronos"], _san, (NAVY, GREY, LGREY, WHITE, TEAL))

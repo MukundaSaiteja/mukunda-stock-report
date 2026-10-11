@@ -17,7 +17,7 @@ def price_chart(price: pd.DataFrame, tech: dict, path: str) -> str:
     """1y price with 50/200-DMA and S/R levels drawn as horizontal lines."""
     df = price.tail(252)
     c = df["Close"]
-    fig, ax = plt.subplots(figsize=(9, 4.2), dpi=110)
+    fig, ax = plt.subplots(figsize=(9, 2.9), dpi=110)
     ax.plot(df.index, c, color=NAVY, lw=1.3, label="Close")
     ax.plot(df.index, c.rolling(50).mean(), color=TEAL, lw=1, label="50-DMA")
     if len(price) >= 200:
@@ -52,7 +52,7 @@ def rsi_macd_chart(price: pd.DataFrame, path: str) -> str:
     macd = e12 - e26
     sig = macd.ewm(span=9).mean()
 
-    fig, (a1, a2) = plt.subplots(2, 1, figsize=(9, 3.6), dpi=110, sharex=True)
+    fig, (a1, a2) = plt.subplots(2, 1, figsize=(9, 2.3), dpi=110, sharex=True)
     a1.plot(df.index, rsi, color=NAVY, lw=1)
     a1.axhline(70, color=RED, lw=0.7, ls="--"); a1.axhline(30, color=GREEN, lw=0.7, ls="--")
     a1.set_ylabel("RSI(14)", fontsize=7); a1.set_ylim(0, 100); a1.grid(alpha=0.25); a1.tick_params(labelsize=7)

@@ -59,6 +59,16 @@ def overall(items: list[dict]) -> dict:
     return dict(label=tone, mean=round(mean, 2), pos=pos, neg=neg, neu=len(items) - pos - neg)
 
 
+STOCK_WORDS = {"share", "shares", "stock", "stocks", "nse", "bse", "results", "result", "profit", "sales", "revenue", "rally", "order", "orders",
+               "dividend", "target", "quarter", "q1", "q2", "q3", "q4", "ipo", "bonus", "multibagger", "agm", "stake", "rating", "earnings",
+               "expansion", "capacity", "investors", "market", "brokerage", "buy", "sell"}
+
+
+def _is_stock_news(low: str) -> bool:
+    """A headline that only shares a first word with another company (e.g. a brewery) has no stock-market word in it."""
+    return bool(STOCK_WORDS & set(_words(low)))
+
+
 def _norm(t: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", t.lower()).strip()[:70]
 
@@ -82,6 +92,8 @@ def parse(xml_text: str, name_tokens: list[str], now: datetime, days: int = 30, 
         low = head.lower()
         if name_tokens and not any(t in low for t in name_tokens):
             continue                                    # keep only headlines that actually name the company
+        if not _is_stock_news(low):
+            continue
         seen.add(key)
         sc = score(head)
         out.append(dict(title=head, source=src, date=when.date().isoformat(), url=(it.findtext("link") or ""), score=sc, label=label(sc)))

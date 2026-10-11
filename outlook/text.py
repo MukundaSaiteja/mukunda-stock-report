@@ -25,7 +25,7 @@ def subtitle(o: Outlook) -> str:
 def table_rows(o: Outlook) -> list[list[str]]:
     rows = [["Horizon", "By", "Kronos predicted price", "vs today's price", "Normal range (80%)"]]
     for s in o.steps:
-        change = "n/a" if s.kronos is None else pct(s.kronos / o.last_close - 1) + ("*" if s.stretched() else "")
+        change = "n/a" if s.kronos is None else pct(s.kronos / o.last_close - 1)
         rows.append([s.label, ("about " if s.sessions > 60 else "") + f"{s.day:%d-%b-%Y}",
                      ("not run" if s.skipped else "not shown") if s.kronos is None else rs(s.kronos), change, f"{rs(s.low)} - {rs(s.high)}"])
     return rows
@@ -44,22 +44,13 @@ def evidence_line(o: Outlook) -> str:
 
 
 def notes(o: Outlook) -> list[str]:
-    out = []
-    if any(s.stretched() for s in o.steps):
-        out.append("* Kronos's guess is outside this stock's normal range for that time, so treat it with extra caution.")
-    skipped = [s.label for s in o.steps if s.skipped]
-    if o.status == "ok" and skipped:
-        out.append(f"Kronos was not run for {_join(skipped)}: that forecast takes about six times longer than the rest and, in our tests, was the least reliable.")
+    """Only a one-line reason when a row is withheld or Kronos did not run; nothing else."""
     hidden = [s for s in o.steps if s.kronos is None and not s.skipped]
     if o.status == "ok" and hidden:
-        later = [s.label for s in hidden[1:]]
-        line = f"Kronos not shown for {hidden[0].label}: {hidden[0].note}."
-        if later:
-            line += f" The longer forecast{'s' * (len(later) > 1)} ({_join(later)}) {'are' if len(later) > 1 else 'is'} not shown either."
-        out.append(line)
-    elif o.status != "ok":
-        out.append(f"Kronos prediction not available this run: {o.note}.")
-    return out + [evidence_line(o)]
+        return [f"Kronos not shown for {hidden[0].label}: {hidden[0].note}."]
+    if o.status != "ok":
+        return [f"Kronos prediction not available this run: {o.note}."]
+    return []
 
 
 def method_line(o: Outlook) -> str:

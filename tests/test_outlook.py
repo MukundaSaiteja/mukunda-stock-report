@@ -51,7 +51,7 @@ def test_default_runs_kronos_to_30_days_only_and_asks_for_21_steps():
     o = build(eng)
     assert set(seen) == {21} and [s.kronos is not None for s in o.steps] == [True, True, False] and o.steps[2].skipped
     assert [r[2] for r in text.table_rows(o)][1:] == [text.rs(o.steps[0].kronos), text.rs(o.steps[1].kronos), "not run"]
-    assert "Kronos was not run for 6 months" in " ".join(text.notes(o))
+    assert text.notes(o) == []                                    # nothing but the table when all is well
 
 
 def test_plausible_run_shows_all_three_rows_with_a_range():
@@ -64,7 +64,7 @@ def test_broken_first_week_withholds_every_longer_row():
     o = build(Scripted({5: -0.77, 21: -0.2, 126: -0.05}))
     assert [s.kronos for s in o.steps] == [None] * 3 and o.steps[2].skipped and "not believable" in o.steps[0].note
     line = next(n for n in text.notes(o) if n.startswith("Kronos not shown"))
-    assert line.startswith("Kronos not shown for 5 days") and "The longer forecast (30 days) is not shown either" in line
+    assert line.startswith("Kronos not shown for 5 days") and "not believable" in line
 
 
 def test_a_good_week_does_not_save_a_broken_month():
@@ -79,7 +79,7 @@ def test_engine_failure_gives_range_only_not_an_exception():
 
     o = build(Broken({}))
     assert o.status == "range_only" and len(o.steps) == 3 and all(s.kronos is None for s in o.steps)
-    assert "not installed" in text.notes(o)[0]
+    assert "not installed" in text.notes(o)[0] and len(text.notes(o)) == 1
 
 
 def test_checkpoint_is_written_before_kronos_runs():
@@ -110,12 +110,13 @@ def test_time_budget_stops_drawing_early_but_keeps_what_it_has():
     assert o.status == "ok" and 8 <= o.paths < 24
 
 
-def test_json_round_trip_and_evidence_text_has_no_invented_numbers():
+def test_json_round_trip_and_no_precaution_text_in_the_section():
     o = build(Scripted({5: 0.01, 21: 0.02, 126: 0.04}))
     back = core.from_json(core.to_json(o))
     assert core.to_json(back) == core.to_json(o) and back.steps == o.steps
-    line = text.evidence_line(o)
-    assert "50% at 5 days, 50% at 30 days and 42% at 6 months" in line and "813, 150 and 38" in line and "not advice" in line
+    blob = " ".join(text.notes(o)) + " ".join(" ".join(r) for r in text.table_rows(o))
+    for gone in ("coin flip", "Experimental", "not advice", "Method:", "*", "extra caution", "six times"):
+        assert gone not in blob
 
 
 def test_runner_switched_off_and_missing_result(monkeypatch):

@@ -16,7 +16,7 @@ def draw(pdf, result, san, palette) -> None:
         pdf.set_text_color(*(color or (0, 0, 0))); pdf.multi_cell(epw, 4.0, san(t)); pdf.set_text_color(0, 0, 0)
 
     o = getattr(result, "outlook", None)
-    if pdf.get_y() > pdf.h - 70:
+    if pdf.get_y() > pdf.h - 55:
         pdf.add_page()
     pdf.ln(1); pdf.set_x(pdf.l_margin); pdf.set_font("Helvetica", "B", 10); pdf.set_text_color(*teal)
     pdf.multi_cell(epw, 5, san(text.TITLE)); pdf.set_text_color(0, 0, 0)
@@ -34,7 +34,6 @@ def draw(pdf, result, san, palette) -> None:
         for w, cell in zip(W, row):
             pdf.cell(epw * w / total, 5.2, san(cell), fill=True)
         pdf.ln(5.2)
-    pdf.set_text_color(0, 0, 0); pdf.ln(1)
+    pdf.set_text_color(0, 0, 0)
     for line in text.notes(o):
         para(line)
-    para(text.method_line(o), 6.8, "I", grey)

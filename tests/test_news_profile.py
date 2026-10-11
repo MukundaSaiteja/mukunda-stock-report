@@ -64,3 +64,8 @@ def test_electrical_equipment_is_industrial_not_utility_and_real_utilities_stay(
     assert f("Utilities - Independent Power Producers", "Utilities", "JSW Energy") == "utility"
     assert f("Specialty Industrial Machinery", "Industrials", "Some Engineering") == "industrial"
     assert f("Banks - Regional", "Financial Services", "HDFC Bank") == "bank"
+
+
+def test_a_different_company_with_the_same_first_word_is_dropped():
+    rss = RSS.replace("</channel>", "<item><title>Vidya Breweries lower circuit today - Univest</title><pubDate>Fri, 09 Oct 2026 11:00:00 GMT</pubDate><link>x</link></item></channel>")
+    assert all("Breweries" not in i["title"] for i in news.parse(rss, news.tokens("Vidya Wires Limited", "VIDYAWIRES"), NOW))

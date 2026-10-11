@@ -113,3 +113,4 @@ rollout took 6-7 min on the free runner. Set `KRONOS_MAX_SESSIONS=126` (workflow
   (Positive / Negative / Mixed / Neutral). Headline words only, not the articles (`analysis/news.py`).
 - **Scorecard sector fix**: electrical / machinery / engineering makers are now "Industrials" (they were filed under Utility because
   the word "electric" matched), with a lower operating-margin bar because copper/steel cost is passed through to customers.
+- **2A. Quarterly results**: latest declared quarter with sales and net profit vs the previous quarter (QoQ) and vs the same quarter last year (YoY), the last 5 quarters, OPM %, and a one-line read (`analysis/quarterly.py`; Screener.in quarterly table, Yahoo for unrounded figures).

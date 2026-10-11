@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from analysis import data as datamod
-from analysis import forensic, news as newsmod, profile, quant, scorecard, technicals, valuation, verdict
+from analysis import forensic, news as newsmod, profile, quant, quarterly, scorecard, technicals, valuation, verdict
 from momentum import engine as momentum_engine
 from outlook import runner as outlook_runner
 from report import pdf as pdfmod
@@ -69,6 +69,7 @@ def analyze(symbol: str, out_pdf: str, with_kronos: bool = True) -> dict:
 
     # What the company does + sector, and the latest news with a headline-tone read. Both best-effort.
     about = profile.build(d.info, sc)
+    qres = quarterly.build(d.symbol, d.quarterly)
     news = newsmod.fetch(d.symbol, snap.get("name"))
 
     # Kronos price prediction (final PDF section). Runs in a child process with a hard time limit; on any
@@ -94,6 +95,7 @@ def analyze(symbol: str, out_pdf: str, with_kronos: bool = True) -> dict:
         "scorecard": sc,
         "kronos": kr,
         "about": about,
+        "quarterly": qres,
         "news": news,
     }
     result["pdf"] = pdfmod.build(result, out_pdf)

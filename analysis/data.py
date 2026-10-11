@@ -31,6 +31,7 @@ class StockData:
     balance_sheet: pd.DataFrame | None = None
     cashflow: pd.DataFrame | None = None
     nifty: pd.DataFrame | None = None           # ^NSEI daily close for RS
+    quarterly: pd.DataFrame | None = None       # quarterly income statement (latest first)
     ok: bool = False
     error: str = ""
 
@@ -69,6 +70,10 @@ def fetch(symbol: str) -> StockData:
             data.cashflow = tk.cashflow
         except Exception:  # noqa: BLE001
             data.cashflow = None
+        try:
+            data.quarterly = tk.quarterly_income_stmt
+        except Exception:  # noqa: BLE001
+            data.quarterly = None
         # Nifty for relative strength.
         try:
             data.nifty = yf.Ticker("^NSEI").history(period="1y", interval="1d")

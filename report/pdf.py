@@ -184,6 +184,34 @@ def build(result: dict, out_path: str) -> str:
     else:
         para("Financial statements unavailable from source (n/a).", 8, "I")
 
+    # ---- 2A. Quarterly results (latest declared quarter, QoQ and YoY) ----
+    qr = result.get("quarterly") or {}
+    if pdf.get_y() > pdf.h - 80:
+        pdf.add_page()            # keep the quarterly table in one piece
+    sec("2A. Quarterly results  -  latest quarter, vs previous quarter (QoQ) and vs same quarter last year (YoY)")
+    if not qr.get("ok"):
+        para(f"Quarterly results unavailable ({qr.get('error') or 'n/a'}).", 8, "I")
+    else:
+        para(qr["headline"], 8.6, "B")
+        cols = [("Quarter", 20), ("Sales (Cr)", 24), ("QoQ", 22), ("YoY", 22), ("Net profit (Cr)", 28), ("QoQ", 24), ("YoY", 24), ("OPM %", 16)]
+        tw = sum(w for _, w in cols)
+        pdf.set_font("Helvetica", "B", 7.6); pdf.set_x(pdf.l_margin)
+        for name, w in cols:
+            pdf.cell(EPW * w / tw, 4.6, name, border=1, align="C")
+        pdf.ln(4.6); pdf.set_font("Helvetica", "", 7.6)
+        for r in qr["rows"]:
+            vals = [r["label"], _num(r["sales"], 0), r["sales_qoq"], r["sales_yoy"], _num(r["np"], 1), r["np_qoq"], r["np_yoy"], _num(r["opm"], 1)]
+            pdf.set_x(pdf.l_margin)
+            for j, ((_, w), v) in enumerate(zip(cols, vals)):
+                pdf.set_text_color(*(GREEN if str(v).startswith("+") else RED if str(v).startswith("-") or v == "loss" else (0, 0, 0)))
+                pdf.cell(EPW * w / tw, 4.6, _san(v), border=1, align="L" if j == 0 else "R")
+            pdf.set_text_color(0, 0, 0); pdf.ln(4.6)
+        para("Read: " + qr["verdict"] + ". " + qr["trend"], 8)
+        if qr.get("stale"):
+            para(qr["stale"], 7.4, "I")
+        para(f"Source: Screener.in quarterly results ({qr.get('basis')}), Yahoo for unrounded figures. Seasonal businesses are best read YoY; "
+             "QoQ shows momentum. Educational, not advice.", 6.8, "I")
+
     # ---- 3. Cash-flow quality & forensic ----
     sec("3. Cash-flow quality & forensic scores")
     kv([
